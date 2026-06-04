@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ServiceMS — PSP102 Service Maintenance & Support</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -310,6 +311,75 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
   .photo-zones{grid-template-columns:1fr}
   .detail-grid{grid-template-columns:1fr}
 }
+</style>
+
+<style id="theme-v2">
+/* ======================= ServiceMS Theme v2 (refined control-room) ======================= */
+:root{
+  /* refined surfaces */
+  --bg:#eef2f8; --bg-w:#ffffff; --bg-card:#ffffff; --bg-surface:#f7f9fc;
+  --bg-input:#eef2f8; --bg-hover:#eaf1fb; --bg-elevated:#e6ecf5;
+  --border:#e3e9f2; --border-s:#eef1f7; --border-f:#2d7ff9;
+  --navy:#16233f; --navy-dark:#0d1729; --navy-mid:#243a63; --navy-light:#3d5a8a;
+  --blue:#2d7ff9; --blue-d:rgba(45,127,249,.08); --blue-glow:rgba(45,127,249,.22);
+  /* softer radii */
+  --r:14px; --r-sm:9px; --r-lg:18px;
+  /* layered cool shadows */
+  --shadow-sm:0 1px 2px rgba(22,35,63,.05),0 2px 5px rgba(22,35,63,.045);
+  --shadow-md:0 8px 22px -6px rgba(22,35,63,.14),0 3px 8px rgba(22,35,63,.06);
+  --shadow-lg:0 22px 50px -14px rgba(22,35,63,.24),0 6px 16px rgba(22,35,63,.08);
+  /* fonts */
+  --font:'IBM Plex Sans Thai','Outfit',sans-serif;
+  --font-d:'Bai Jamjuree','IBM Plex Sans Thai',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+}
+body{background:radial-gradient(1100px 520px at 100% -10%,rgba(45,127,249,.06),transparent 60%),var(--bg);}
+/* display font on headings & hero numbers */
+h1,h2,h3,h4,#pageTitle,.stat-total,.kv,.brand-name,.card-h h4,.login-title{font-family:var(--font-d);letter-spacing:.2px}
+
+/* ---------- micro-interactions ---------- */
+.card{transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s,border-color .22s}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#cfe0fb}
+.stat-card{transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s,border-color .22s}
+.stat-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md);border-color:#cfe0fb}
+.btn{transition:transform .14s ease,box-shadow .16s ease,filter .16s ease,background .16s ease,border-color .16s ease}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);filter:saturate(1.05)}
+.btn:active{transform:translateY(0) scale(.97)}
+.btn-pri:hover,.btn-suc:hover,.btn-war:hover,.btn-report:hover{box-shadow:0 7px 18px -5px var(--blue-glow)}
+.nav-i{transition:transform .18s ease,background .18s ease,color .18s ease}
+.nav-i:hover{transform:translateX(3px)}
+.dtbl tbody tr{transition:background .15s ease,transform .15s ease}
+.appt,.tm-card{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.appt:hover,.tm-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.sts,.badge{transition:filter .15s ease}
+/* page enter */
+.fade-in{animation:fadeUp .34s cubic-bezier(.2,.8,.2,1)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ---------- skeleton + polished loading ---------- */
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton,.sk-line{background:linear-gradient(90deg,#e9eef5 25%,#dde6f1 37%,#e9eef5 63%);background-size:200% 100%;animation:shimmer 1.3s ease-in-out infinite;border-radius:8px}
+.sk-line{height:12px;margin:8px 0}
+.sk-card{height:80px;border-radius:var(--r)}
+#loadingOverlay{background:rgba(22,35,63,.45)!important;backdrop-filter:blur(5px)}
+.loading-box{border-radius:18px!important;box-shadow:var(--shadow-lg)!important;padding:30px 40px!important;border:1px solid var(--border)}
+.loading-box .brand-logo{animation:logoPulse 1.3s ease-in-out infinite}
+@keyframes logoPulse{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}
+.loading-box::after{content:"";display:block;height:4px;width:130px;margin:16px auto 0;border-radius:4px;background:linear-gradient(90deg,var(--border-s),var(--blue),var(--border-s));background-size:200% 100%;animation:shimmer 1.1s linear infinite}
+
+/* ---------- toast ---------- */
+#toastWrap{position:fixed;top:18px;right:18px;z-index:100000;display:flex;flex-direction:column;gap:10px;max-width:min(92vw,380px);pointer-events:none}
+@media(max-width:600px){#toastWrap{left:50%;right:auto;transform:translateX(-50%);top:12px;width:92vw}}
+.toast{pointer-events:auto;display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:13px;padding:12px 12px 12px 14px;box-shadow:var(--shadow-lg);font-size:.84rem;color:var(--text-1);opacity:0;transform:translateY(-12px) scale(.97);transition:opacity .3s,transform .3s cubic-bezier(.2,.8,.2,1);cursor:pointer}
+.toast.show{opacity:1;transform:none}
+.toast.hide{opacity:0;transform:translateY(-8px) scale(.97)}
+.toast .t-ic{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.78rem;font-family:var(--mono);margin-top:1px}
+.toast .t-msg{flex:1;line-height:1.45;word-break:break-word}
+.toast .t-x{flex:0 0 auto;background:none;border:none;color:var(--text-3);font-size:1.15rem;cursor:pointer;line-height:1;padding:0 2px}
+.t-success{border-left-color:var(--green-st)} .t-success .t-ic{background:var(--green-st)}
+.t-error{border-left-color:var(--red)} .t-error .t-ic{background:var(--red)}
+.t-warn{border-left-color:var(--orange-st)} .t-warn .t-ic{background:var(--orange-st)}
+.t-info{border-left-color:var(--blue)} .t-info .t-ic{background:var(--blue)}
 </style>
 </head>
 <body>
@@ -1019,6 +1089,38 @@ document.addEventListener('DOMContentLoaded',function(){
   document.addEventListener('click',function(e){if(!e.target.closest('.notif-b')&&!e.target.closest('.notif-panel')){var p=document.getElementById('notifPanel');if(p)p.classList.remove('open');}});
   tryRestore();
 });
+</script>
+
+<script id="theme-v2-js">
+(function(){
+  if(window.__toastReady) return; window.__toastReady=true;
+  var wrap=document.createElement('div'); wrap.id='toastWrap';
+  (document.body||document.documentElement).appendChild(wrap);
+  function ic(t){return t==='success'?'\u2713':t==='error'?'\u2715':t==='warn'?'!':'i';}
+  window.toast=function(msg,type,ms){
+    msg=(msg==null?'':''+msg);
+    if(!type){
+      if(/\u2705|\u2713|success|created|saved|updated|\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08|\u0e40\u0e23\u0e35\u0e22\u0e1a\u0e23\u0e49\u0e2d\u0e22/i.test(msg)) type='success';
+      else if(/\u274c|error|failed|fail|\u0e1c\u0e34\u0e14\u0e1e\u0e25\u0e32\u0e14/i.test(msg)) type='error';
+      else if(/\u26a0|required|select|\u0e01\u0e23\u0e38\u0e13\u0e32|\u0e15\u0e49\u0e2d\u0e07|\u0e40\u0e25\u0e37\u0e2d\u0e01/i.test(msg)) type='warn';
+      else type='info';
+    }
+    var clean=msg.replace(/^[\u2705\u274c\u26a0\ufe0f\u2139\s]+/,'').trim(); if(!clean) clean=msg;
+    var el=document.createElement('div'); el.className='toast t-'+type;
+    el.innerHTML='<span class="t-ic"></span><span class="t-msg"></span><button class="t-x" aria-label="close">\u00d7</button>';
+    el.querySelector('.t-ic').textContent=ic(type);
+    el.querySelector('.t-msg').textContent=clean;
+    wrap.appendChild(el);
+    requestAnimationFrame(function(){el.classList.add('show');});
+    var to=setTimeout(close, ms||(type==='error'?5200:3300));
+    function close(){clearTimeout(to);el.classList.remove('show');el.classList.add('hide');setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},340);}
+    el.querySelector('.t-x').addEventListener('click',function(e){e.stopPropagation();close();});
+    el.addEventListener('click',close);
+    return el;
+  };
+  var _alert=window.alert.bind(window);
+  window.alert=function(m){ try{ window.toast(m); }catch(e){ _alert(m); } };
+})();
 </script>
 </body>
 </html>
