@@ -1061,7 +1061,7 @@ function printWorkReport(id,type){
 }
 
 function renderLetters(){
- return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div class="filter-bar" style="margin-bottom:0"><input placeholder="🔍 ค้นหา..." style="width:200px" oninput="filterTable(this,\'ltTbl\')"></div><button class="btn btn-pri" onclick="openNewSMLetter()">✉️ จดหมายแจ้งแผน (S&amp;M)</button> <button class="btn btn-sec" onclick="openNewLetter()">+ ทั่วไป</button></div>'
+ return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div class="filter-bar" style="margin-bottom:0"><input placeholder="🔍 ค้นหา..." style="width:200px" oninput="filterTable(this,\'ltTbl\')"></div><button class="btn btn-pri" onclick="openNewSMLetter()">✉️ Service Official Letter</button> <button class="btn btn-sec" onclick="openNewLetter()">OFFICIAL LETTER</button></div>'
   +'<div class="card"><div class="card-b" style="overflow-x:auto"><table class="dtbl" id="ltTbl"><thead><tr><th>เลขที่</th><th>วันที่</th><th>เรื่อง</th><th>เรียน</th><th>สถานะ</th><th>Actions</th></tr></thead><tbody>'
   +(DB.letters.length?DB.letters.map(function(l){return '<tr><td style="font-family:var(--mono);font-size:.78rem">'+esc(l.letter_no)+'</td><td style="font-size:.78rem">'+fmtDate(l.letter_date)+'</td><td>'+esc(l.subject)+'</td><td style="font-size:.8rem">'+esc(l.recipient)+'</td><td><span class="sts '+stsCls(l.status)+'">'+esc(l.status)+'</span></td><td style="white-space:nowrap"><button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Letter\',\''+l.id+'\')">📄</button>'+(curRole==='manager'?' <button class="btn btn-dan btn-sm" onclick="deleteRecord(\'Letters\',\''+l.id+'\')">🗑</button>':'')+'</td></tr>'}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:20px">ยังไม่มีจดหมาย — กด “+ ออกจดหมายใหม่”</td></tr>')
   +'</tbody></table></div></div>';
@@ -1077,7 +1077,7 @@ function openNewLetter(){gsr('serverGetNextLetter').then(function(no){
   +'<div class="frow full"><div class="fg"><label>เนื้อความ</label><textarea id="f_lt_body" style="min-height:140px" placeholder="พิมพ์เนื้อความจดหมาย... (ขึ้นบรรทัดใหม่ได้)"></textarea></div></div>'
   +'<div class="frow"><div class="fg"><label>ผู้ลงนาม</label><input id="f_lt_signer" value="'+esc(curUser)+'"></div><div class="fg"><label>ตำแหน่ง</label><input id="f_lt_pos" placeholder="ตำแหน่งผู้ลงนาม"></div></div>'
   +'<div class="frow full"><div class="fg"><label>สำเนาเรียน (ถ้ามี)</label><input id="f_lt_cc" placeholder="ผู้รับสำเนา..."></div></div>';
- openModal('✉️ ออกจดหมายใหม่',body,'<button class="btn btn-pri" onclick="createLetter()">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
+ openModal('OFFICIAL LETTER',body,'<button class="btn btn-pri" onclick="createLetter()">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
 }).catch(function(e){alert('Error: '+e)});}
 function createLetter(){
  function v(id){var el=document.getElementById(id);return el?el.value:'';}
@@ -1101,7 +1101,7 @@ function openNewSMLetter(){gsr('serverGetNextSM').then(function(no){
   +'<div class="frow full"><div class="fg"><label>รายชื่อเจ้าหน้าที่ (บรรทัดละคน รูปแบบ: ชื่อ | เบอร์)</label><textarea id="sm_tech" style="min-height:70px">'+tl+'</textarea></div></div>'
   +'<div class="frow"><div class="fg"><label>ผู้ลงนาม</label><input id="sm_signer" value="นาย สิรดนัย ศิริสุนทร"></div><div class="fg"><label>ตำแหน่ง/แผนก</label><input id="sm_pos" value="แผนกบริการและบำรุงรักษา"></div></div>'
   +'<div class="frow full"><div class="fg"><label>ลายเซ็น (เว้นว่าง = ใช้ลายเซ็นเริ่มต้น / วาดเพื่อแทนที่)</label>'+buildSigPad('sm_sig','ผู้ลงนาม')+'</div></div>';
- openModal('✉️ ออกจดหมายแจ้งแผน (S&M)',body,'<button class="btn btn-pri" onclick="createSMLetter()">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
+ openModal('Service Official Letter',body,'<button class="btn btn-pri" onclick="createSMLetter()">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
  setTimeout(function(){initSigPad('sm_sig');},80);
 }).catch(function(e){alert('Error: '+e)});}
 function createSMLetter(){
