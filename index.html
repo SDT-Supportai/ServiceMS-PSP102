@@ -1093,38 +1093,56 @@ function renderWarrantyPeriod(){
   if(!done.length)return '<div class="empty-state"><div class="es-emo">🛡️</div><div class="es-txt">ยังไม่มีงาน LBS ที่เสร็จสิ้น</div><div class="es-sub">งานสถานะ COMPLETED จะมาแสดงที่นี่เพื่อออกหนังสือรับประกัน</div></div>';
   var rows=done.map(function(l){
     var lt=issued[l.job_no];
-    var act=can('serviceOps')?(lt?'<button class="btn btn-sec btn-sm" onclick="generatePDF(\'Letter\',\''+lt.id+'\')">📄 ดูจดหมาย</button> <button class="btn btn-war btn-sm" onclick="openNewWarrantyLetter(\''+l.id+'\')">↻ ออกใหม่</button>':'<button class="btn btn-pri btn-sm" onclick="openNewWarrantyLetter(\''+l.id+'\')">🛡️ ออก Warranty Letter</button>'):'—';
+    var act;
+    if(!can('serviceOps'))act='—';
+    else if(!lt)act='<button class="btn btn-pri btn-sm" onclick="openNewWarrantyLetter(\''+l.id+'\')">🛡️ ออก Warranty Letter</button>';
+    else act='<button class="btn btn-sec btn-sm" onclick="generatePDF(\'Letter\',\''+lt.id+'\')">📄 ดู</button>'+(can('editRecord')?' <button class="btn btn-pri btn-sm" onclick="openEditWarrantyLetter(\''+lt.id+'\')">✏️ แก้ไข</button>':'')+(can('deleteRecord')?' <button class="btn btn-dan btn-sm" onclick="deleteRecord(\'Letters\',\''+lt.id+'\')">🗑 ลบ</button>':'');
     return '<tr><td style="font-family:var(--mono);font-size:.78rem">'+esc(l.job_no)+'</td><td>'+esc(l.project_name)+'</td><td style="font-size:.78rem">'+esc(l.customer_name||'—')+'</td><td style="font-size:.72rem;color:var(--text-2)">'+fmtDate(l.planned_end)+'</td><td>'+(lt?'<span class="sts done">ออกแล้ว · '+esc(lt.letter_no)+'</span>':'<span class="sts submitted">ยังไม่ออก</span>')+'</td><td style="white-space:nowrap">'+act+'</td></tr>';
   }).join('');
   return '<div class="card"><div class="card-h"><h4>🛡️ Warranty Period — งาน LBS ที่เสร็จสิ้น</h4><span class="ch-sub">'+done.length+' งาน</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Completed</th><th>Warranty Letter</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+function warrantyFormBody(d){
+  function wt(t){return '<option '+(d.warranty_type===t?'selected':'')+'>'+t+'</option>';}
+  return '<div class="frow"><div class="fg"><label>เลขที่ (อัตโนมัติ)</label><input id="wl_no" value="'+esc(d.letter_no||'')+'" readonly style="background:var(--bg-elevated);font-family:var(--mono);color:#1a4d8f;font-weight:700"></div><div class="fg"><label>วันที่ (แสดงเป็น DD-MM-YYYY)</label><input type="date" id="wl_date" value="'+(d.letter_date?parseISO(d.letter_date):'')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>ลูกค้า / ที่อยู่หน่วยงาน</label><textarea id="wl_recip" style="min-height:80px">'+esc(d.recipient||'')+'</textarea></div></div>'
+    +'<div class="frow full"><div class="fg"><label>เรื่อง</label><input id="wl_subject" value="'+esc(d.subject||'')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>สถานที่ (บรรทัดใต้เรื่อง)</label><input id="wl_site" value="'+esc(d.site||'')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>เรียน (ลูกค้า)</label><input id="wl_attn" value="'+esc(d.attention||'')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>อ้างถึง (งาน LBS ที่ Completed)</label><input id="wl_ref" value="'+esc(d.reference||'')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>เนื้อความ ย่อหน้า 1</label><textarea id="wl_b1" style="min-height:90px">'+esc(d.body||'')+'</textarea></div></div>'
+    +'<div class="frow full"><div class="fg"><label>เนื้อความ ย่อหน้า 2 (Warranty Type)</label><textarea id="wl_b2" style="min-height:80px">'+esc(d.body2||'')+'</textarea></div></div>'
+    +'<div class="frow"><div class="fg"><label>Warranty Type</label><select id="wl_wtype">'+wt('FULL')+wt('PARTIAL_EQUIPMENT')+wt('LABOR_ONLY')+wt('OTHER')+'</select></div><div class="fg"><label>&nbsp;</label><input value="" disabled style="visibility:hidden"></div></div>'
+    +'<div class="frow"><div class="fg"><label>Warranty Start</label><input type="date" id="wl_wstart" value="'+(d.warranty_start?parseISO(d.warranty_start):'')+'"></div><div class="fg"><label>Warranty End</label><input type="date" id="wl_wend" value="'+(d.warranty_end?parseISO(d.warranty_end):'')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>รายละเอียดการรับประกัน</label><textarea id="wl_wdetail" style="min-height:80px" placeholder="ชี้แจงขอบเขต / เงื่อนไขการรับประกัน...">'+esc(d.warranty_detail||'')+'</textarea></div></div>'
+    +'<div class="frow"><div class="fg"><label>ผู้ลงนาม</label><input id="wl_signer" value="'+esc(d.signer_name||'นาย สิรดนัย ศิริสุนทร')+'"></div><div class="fg"><label>ตำแหน่ง/แผนก</label><input id="wl_pos" value="'+esc(d.signer_position||'แผนกบริการและบำรุงรักษา')+'"></div></div>'
+    +'<div class="frow full"><div class="fg"><label>ลายเซ็น (เว้นว่าง = ลายเซ็นเดิม/เริ่มต้น / วาดเพื่อแทนที่)</label>'+buildSigPad('wl_sig','ผู้ลงนาม')+'</div></div>';
+}
+function collectWarranty(){
+  function v(id){var el=document.getElementById(id);return el?el.value:'';}
+  return {letter_date:v('wl_date'),recipient:v('wl_recip').trim(),subject:v('wl_subject').trim(),site:v('wl_site').trim(),attention:v('wl_attn').trim(),reference:v('wl_ref').trim(),body:v('wl_b1').trim(),body2:v('wl_b2').trim(),warranty_type:v('wl_wtype'),warranty_start:v('wl_wstart'),warranty_end:v('wl_wend'),warranty_detail:v('wl_wdetail').trim(),signer_name:v('wl_signer').trim(),signer_position:v('wl_pos').trim()};
 }
 function openNewWarrantyLetter(lbsId){
   var l=DB.lbsWorks.find(function(x){return x.id===lbsId});if(!l)return;
   gsr('serverGetNextWarranty').then(function(no){
     var today=new Date().toISOString().slice(0,10);
-    var recip=esc(l.customer_name||'')+(l.location?'\n'+esc(l.location):'');
-    var body='<div class="frow"><div class="fg"><label>เลขที่ (อัตโนมัติ)</label><input id="wl_no" value="'+no+'" readonly style="background:var(--bg-elevated);font-family:var(--mono);color:#1a4d8f;font-weight:700"></div><div class="fg"><label>วันที่ (แสดงเป็น DD-MM-YYYY)</label><input type="date" id="wl_date" value="'+today+'"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>ลูกค้า / ที่อยู่หน่วยงาน</label><textarea id="wl_recip" style="min-height:80px">'+recip+'</textarea></div></div>'
-      +'<div class="frow full"><div class="fg"><label>เรื่อง</label><input id="wl_subject" value="หนังสือรับประกันผลงาน '+esc(l.project_name||'')+'"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>สถานที่ (บรรทัดใต้เรื่อง)</label><input id="wl_site" value="'+esc(l.location||'')+'"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>เรียน (ลูกค้า)</label><input id="wl_attn" value="'+esc(l.customer_contact||'')+'"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>อ้างถึง (งาน LBS ที่ Completed)</label><input id="wl_ref" value="'+esc(l.job_no+(l.project_name?' — '+l.project_name:''))+'"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>เนื้อความ ย่อหน้า 1</label><textarea id="wl_b1" style="min-height:90px">ตามที่ บริษัท พรีไซซ ซิสเท็ม แอนด์ โปรเจ็ค จำกัด ได้ดำเนินการงาน '+esc(l.project_name||'')+' ('+esc(l.job_no)+') เสร็จสมบูรณ์แล้วนั้น</textarea></div></div>'
-      +'<div class="frow full"><div class="fg"><label>เนื้อความ ย่อหน้า 2 (Warranty Type)</label><textarea id="wl_b2" style="min-height:80px">บริษัทฯ ขอรับประกันผลงานดังกล่าวตามประเภทและระยะเวลาที่ระบุไว้ด้านล่างนี้</textarea></div></div>'
-      +'<div class="frow"><div class="fg"><label>Warranty Type</label><select id="wl_wtype"><option>FULL</option><option>PARTIAL_EQUIPMENT</option><option>LABOR_ONLY</option><option>OTHER</option></select></div><div class="fg"><label>&nbsp;</label><input value="" disabled style="visibility:hidden"></div></div>'
-      +'<div class="frow"><div class="fg"><label>Warranty Start</label><input type="date" id="wl_wstart" value="'+today+'"></div><div class="fg"><label>Warranty End</label><input type="date" id="wl_wend"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>รายละเอียดการรับประกัน</label><textarea id="wl_wdetail" style="min-height:80px" placeholder="ชี้แจงขอบเขต / เงื่อนไขการรับประกัน..."></textarea></div></div>'
-      +'<div class="frow"><div class="fg"><label>ผู้ลงนาม</label><input id="wl_signer" value="นาย สิรดนัย ศิริสุนทร"></div><div class="fg"><label>ตำแหน่ง/แผนก</label><input id="wl_pos" value="แผนกบริการและบำรุงรักษา"></div></div>'
-      +'<div class="frow full"><div class="fg"><label>ลายเซ็น (เว้นว่าง = ลายเซ็นเริ่มต้น / วาดเพื่อแทนที่)</label>'+buildSigPad('wl_sig','ผู้ลงนาม')+'</div></div>';
-    openModal('🛡️ Warranty Official Letter',body,'<button class="btn btn-pri" onclick="createWarrantyLetter(\''+l.job_no+'\')">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
+    var d={letter_no:no,letter_date:today,recipient:(l.customer_name||'')+(l.location?'\n'+l.location:''),subject:'หนังสือรับประกันผลงาน '+(l.project_name||''),site:l.location||'',attention:l.customer_contact||'',reference:l.job_no+(l.project_name?' — '+l.project_name:''),body:'ตามที่ บริษัท พรีไซซ ซิสเท็ม แอนด์ โปรเจ็ค จำกัด ได้ดำเนินการงาน '+(l.project_name||'')+' ('+l.job_no+') เสร็จสมบูรณ์แล้วนั้น',body2:'บริษัทฯ ขอรับประกันผลงานดังกล่าวตามประเภทและระยะเวลาที่ระบุไว้ด้านล่างนี้',warranty_type:'FULL',warranty_start:today,warranty_end:'',warranty_detail:''};
+    openModal('🛡️ Warranty Official Letter',warrantyFormBody(d),'<button class="btn btn-pri" onclick="createWarrantyLetter(\''+l.job_no+'\')">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
     setTimeout(function(){initSigPad('wl_sig');},80);
   }).catch(function(e){alert('Error: '+e)});
 }
 function createWarrantyLetter(refJob){
-  function v(id){var el=document.getElementById(id);return el?el.value:'';}
-  var data={category:'WARRANTY',letter_date:v('wl_date'),letter_type:'EXTERNAL',recipient:v('wl_recip').trim(),subject:v('wl_subject').trim(),site:v('wl_site').trim(),attention:v('wl_attn').trim(),reference:v('wl_ref').trim(),ref_job:refJob,body:v('wl_b1').trim(),body2:v('wl_b2').trim(),warranty_type:v('wl_wtype'),warranty_start:v('wl_wstart'),warranty_end:v('wl_wend'),warranty_detail:v('wl_wdetail').trim(),signer_name:v('wl_signer').trim(),signer_position:v('wl_pos').trim(),sig_image:getSigDataURL('wl_sig'),created_by:curUser,created_at:new Date().toISOString().slice(0,10)};
+  var data=collectWarranty();data.category='WARRANTY';data.letter_type='EXTERNAL';data.ref_job=refJob;data.sig_image=getSigDataURL('wl_sig');data.created_by=curUser;data.created_at=new Date().toISOString().slice(0,10);
   if(!data.recipient||!data.subject||!data.body){alert('กรุณากรอก ลูกค้า / เรื่อง / เนื้อความ ให้ครบ');return;}
   showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('❌ '+(r.error||'Error'));return;}return loadAllData().then(function(){hideLoading();closeModal();setLbTab('warranty');alert('✅ ออก Warranty Letter '+r.letter_no+' เรียบร้อย');});}).catch(function(e){hideLoading();alert('Error: '+e)});}
+function openEditWarrantyLetter(letterId){
+  var lt=DB.letters.find(function(x){return x.id===letterId});if(!lt)return;
+  openModal('✏️ แก้ไข Warranty Letter — '+esc(lt.letter_no),warrantyFormBody(lt),'<button class="btn btn-pri" onclick="saveWarrantyLetter(\''+lt.id+'\')">💾 บันทึก</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
+  setTimeout(function(){initSigPad('wl_sig');},80);
+}
+function saveWarrantyLetter(id){
+  var data=collectWarranty();var sig=getSigDataURL('wl_sig');if(sig)data.sig_image=sig;
+  if(!data.recipient||!data.subject||!data.body){alert('กรุณากรอก ลูกค้า / เรื่อง / เนื้อความ ให้ครบ');return;}
+  showLoading('Saving...');gsr('serverUpdateRecord','Letters',id,data,curUser).then(function(r){if(!r.success){hideLoading();alert('❌ '+(r.error||'Error'));return;}return loadAllData().then(function(){hideLoading();closeModal();setLbTab('warranty');alert('✅ บันทึกการแก้ไขแล้ว');});}).catch(function(e){hideLoading();alert('Error: '+e)});}
 
 /* ═══════════════════════════════════════════════════════
    SERVICE ORDERS & REPORTS (unchanged from v5.5)
@@ -1261,7 +1279,38 @@ function saveBudgetUpdate(id){var newBudget=parseInt(document.getElementById('ed
 /* ═══════════════════════════════════════════════════════
    PDF, SETTINGS, EVENT LISTENERS
 ═══════════════════════════════════════════════════════ */
-function generatePDF(type,id){showLoading('Generating...');gsr('serverGeneratePDF',type,id).then(function(r){hideLoading();if(r.success){var pS=(type==='Letter')?'':'<style>@media print{@page{size:A4;margin:15mm 12mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>';var fullHtml=pS?r.html.replace('</head>',pS+'</head>'):r.html;var blob=new Blob([fullHtml],{type:'text/html;charset=utf-8'});var url=URL.createObjectURL(blob);var frame=document.createElement('iframe');frame.style.cssText='position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';frame.src=url;frame.onload=function(){try{frame.contentWindow.print();}catch(ex){window.open(url,'_blank');}setTimeout(function(){if(document.body.contains(frame))document.body.removeChild(frame);URL.revokeObjectURL(url);},15000);};document.body.appendChild(frame);}else alert(r.error||'Error');}).catch(function(e){hideLoading();alert('Error: '+e)});}
+/* Mobile-friendly print: open a REAL tab (survives popup blockers when opened
+   in the click gesture) with a print toolbar; desktop auto-prints, mobile lets
+   the user tap "พิมพ์/บันทึก PDF" → browser Share → Save to PDF. */
+function openPrintWindow(){
+  var w=window.open('','_blank');
+  if(!w){alert('กรุณาอนุญาต Pop-up ของเบราว์เซอร์ เพื่อเปิด/บันทึกเอกสาร PDF');return null;}
+  try{w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>กำลังเตรียมเอกสาร…</title></head><body style="font-family:sans-serif;color:#555;text-align:center;padding:48px">กำลังเตรียมเอกสาร…</body></html>');}catch(e){}
+  return w;
+}
+function writePrintWindow(w,html){
+  if(!w)return;
+  var isMobile=/Android|webOS|iPhone|iPad|iPod|Mobile|BlackBerry|IEMobile/i.test(navigator.userAgent);
+  var bar='<div class="__pbar" style="position:sticky;top:0;z-index:2147483647;display:flex;gap:10px;justify-content:center;align-items:center;padding:10px;background:#1a2744;box-shadow:0 2px 8px rgba(0,0,0,.25)">'
+    +'<button type="button" onclick="window.print()" style="padding:11px 20px;border:none;border-radius:8px;background:#f5920b;color:#fff;font-weight:700;font-size:15px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button>'
+    +'<button type="button" onclick="window.close()" style="padding:11px 18px;border:none;border-radius:8px;background:#fff;color:#1a2744;font-weight:600;font-size:15px;cursor:pointer">ปิด</button>'
+    +'</div><style>@media print{.__pbar{display:none!important}}</style>';
+  var out=/<body[^>]*>/i.test(html)?html.replace(/(<body[^>]*>)/i,'$1'+bar):bar+html;
+  if(!isMobile){var ap='<scr'+'ipt>window.addEventListener("load",function(){setTimeout(function(){try{window.focus();window.print();}catch(e){}},350);});</scr'+'ipt>';out=/<\/body>/i.test(out)?out.replace(/<\/body>/i,ap+'</body>'):out+ap;}
+  try{w.document.open();w.document.write(out);w.document.close();}catch(e){}
+}
+function generatePDF(type,id){
+  var pw=openPrintWindow();if(!pw)return;
+  showLoading('Generating...');
+  gsr('serverGeneratePDF',type,id).then(function(r){
+    hideLoading();
+    if(r.success){
+      var pS=(type==='Letter')?'':'<style>@media print{@page{size:A4;margin:15mm 12mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>';
+      var fullHtml=pS?r.html.replace('</head>',pS+'</head>'):r.html;
+      writePrintWindow(pw,fullHtml);
+    } else { try{pw.close();}catch(e){} alert(r.error||'Error'); }
+  }).catch(function(e){hideLoading();try{pw.close();}catch(_){} alert('Error: '+e);});
+}
 
 function openLBSWorkReport(lbsId){var l=DB.lbsWorks.find(function(x){return x.id===lbsId});if(!l){alert('LBS not found');return;}resetPhotos();var teamNames=Array.isArray(l.assigned_team)?l.assigned_team.filter(Boolean).map(function(tid){return esc(getTeamName(tid))}).join(', '):'—';var body='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;background:var(--bg-surface);border-radius:var(--r-sm);padding:12px;border:1px solid var(--border-s)"><div><div style="font-size:.64rem;color:var(--text-3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Job No.</div><div style="font-family:var(--mono);font-weight:600">'+esc(l.job_no)+'</div></div><div><div style="font-size:.64rem;color:var(--text-3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Project</div><div style="font-weight:500">'+esc(l.project_name)+'</div></div><div><div style="font-size:.64rem;color:var(--text-3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Location</div><div>'+esc(l.location)+'</div></div><div><div style="font-size:.64rem;color:var(--text-3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Team</div><div>'+teamNames+'</div></div></div><div class="fg"><label>Work Summary</label><textarea id="rpt_notes" placeholder="Summary of work performed..." style="min-height:90px"></textarea></div><div class="photo-zones"><div><div class="photo-zone-label">Before</div><div class="upload-zone" onclick="document.getElementById(\'ph_b_inp\').click()"><div class="uz-icon">📷</div><div class="uz-text">Click or drag photos</div></div><input type="file" id="ph_b_inp" accept="image/*" multiple style="display:none" onchange="handlePhoto(this,\'before\')"><div class="upload-preview" id="photo_before_preview"></div></div><div><div class="photo-zone-label">After</div><div class="upload-zone" onclick="document.getElementById(\'ph_a_inp\').click()"><div class="uz-icon">📸</div><div class="uz-text">Click or drag photos</div></div><input type="file" id="ph_a_inp" accept="image/*" multiple style="display:none" onchange="handlePhoto(this,\'after\')"><div class="upload-preview" id="photo_after_preview"></div></div></div><div class="form-section-title" style="margin-top:14px">✍️ ลายเซ็น / Signatures</div><div class="sig-2col">'+buildSigPad('lbs_tech','ผู้ปฏิบัติงาน / Technician')+buildSigPad('lbs_cust','ลูกค้า/ผู้รับมอบงาน / Customer')+'</div>';openModal('📝 Work Report — '+esc(l.job_no),body,'<button class="btn btn-report" onclick="printWorkReport(\''+lbsId+'\',\'LBS\')">🖨️ Print PDF</button><button class="btn btn-sec" onclick="closeModal()">Close</button>');setTimeout(function(){initSigPad('lbs_tech');initSigPad('lbs_cust');},80);}
 
@@ -1274,6 +1323,7 @@ function getBrandLogoURI(){try{var probe=document.createElement('div');probe.cla
 function printWorkReport(id,type){
   var l=DB.lbsWorks.find(function(x){return x.id===id});
   if(!l){alert('LBS not found');return;}
+  var pw=openPrintWindow();if(!pw)return;
   var notesEl=document.getElementById('rpt_notes');
   var notes=notesEl?notesEl.value.trim():'';
   var before=getActivePhotos('before'),after=getActivePhotos('after');var sigT=getSigDataURL('lbs_tech'),sigC=getSigDataURL('lbs_cust');function sigImg(u){return u?'<img src="'+u+'" style="position:absolute;left:50%;bottom:30px;transform:translateX(-50%);max-height:60px">':'';}
@@ -1308,13 +1358,7 @@ function printWorkReport(id,type){
     +'<div class="sigrow"><div class="sigbox">'+sigImg(sigT)+'<div class="sigline"></div><div class="siglbl">ผู้ปฏิบัติงาน / Technician</div></div><div class="sigbox">'+sigImg(sigC)+'<div class="sigline"></div><div class="siglbl">ลูกค้า/ผู้รับมอบงาน / Customer</div></div></div>'
     +'<div class="foot">Generated by ServiceMS \u00b7 '+dstr+' \u00b7 By Mr.Siradanai Sirisunthorn</div>'
     +'</body></html>';
-  var blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  var url=URL.createObjectURL(blob);
-  var frame=document.createElement('iframe');
-  frame.style.cssText='position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden';
-  frame.src=url;
-  frame.onload=function(){try{frame.contentWindow.focus();frame.contentWindow.print();}catch(ex){window.open(url,'_blank');}setTimeout(function(){if(document.body.contains(frame))document.body.removeChild(frame);URL.revokeObjectURL(url);},15000);};
-  document.body.appendChild(frame);
+  writePrintWindow(pw,html);
   addLog('Generated LBS Work Report '+l.job_no);
 }
 
