@@ -1083,15 +1083,22 @@ function renderHandoverList(){
   var bar='<div class="stabs" style="margin-bottom:14px">'+hoTabBtn(tab,'handover','📋 Project Handover')+hoTabBtn(tab,'repair','🔧 Repair Requests')+hoTabBtn(tab,'reports','📝 Service Reports')+'</div>';
   if(tab==='repair')return bar+renderServiceOrders();
   if(tab==='reports')return bar+renderServiceReports();
-  return bar+'<div class="filter-bar"><input placeholder="🔍 Search..." style="width:200px" oninput="filterTable(this,\'hoTbl\')"><select onchange="filterTableStatus(this,\'hoTbl\')"><option value="">All Status</option><option>APPROVED</option><option>RETURNED</option><option>COMPLETED</option></select></div>'
-    +'<div class="card"><div class="card-b" style="overflow-x:auto"><table class="dtbl" id="hoTbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Contact</th><th>Warranty</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
-    +DB.handovers.filter(function(h){return !['SUBMITTED','RESUBMITTED'].includes(h.status)}).map(function(h){return '<tr data-status="'+h.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showHandoverDetail(\''+h.id+'\')">'+esc(h.job_no)+'</td><td>'+esc(h.project_name)+'</td><td style="font-size:.78rem">'+esc(h.customer_name||'—')+'</td><td style="font-size:.75rem"><div>'+esc(h.customer_contact||'—')+'</div><div style="color:var(--text-3)">'+esc(h.phone||'')+'</div></td><td style="font-size:.72rem">'+h.warranty_type+'<br><span style="color:var(--text-3)">'+fmtDate(h.warranty_start)+' → '+fmtDate(h.warranty_end)+'</span></td><td style="font-family:var(--mono)">'+fmtTHBShort(h.warranty_budget)+'</td><td><span class="sts '+stsCls(h.status)+'">'+h.status+'</span></td>'
+  var hos=DB.handovers.filter(function(h){return !['SUBMITTED','RESUBMITTED'].includes(h.status)});
+  function hoRow(h){return '<tr data-status="'+h.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showHandoverDetail(\''+h.id+'\')">'+esc(h.job_no)+'</td><td>'+esc(h.project_name)+'</td><td style="font-size:.78rem">'+esc(h.customer_name||'—')+'</td><td style="font-size:.75rem"><div>'+esc(h.customer_contact||'—')+'</div><div style="color:var(--text-3)">'+esc(h.phone||'')+'</div></td><td style="font-size:.72rem">'+(h.warranty_type||'—')+'<br><span style="color:var(--text-3)">'+fmtDate(h.warranty_start)+' → '+fmtDate(h.warranty_end)+'</span></td><td style="font-family:var(--mono)">'+fmtTHBShort(h.warranty_budget)+'</td><td><span class="sts '+stsCls(h.status)+'">'+h.status+'</span></td>'
       +'<td style="white-space:nowrap"><button class="btn btn-sec btn-sm" onclick="showHandoverDetail(\''+h.id+'\')">&#128065; View</button> '
       +(['SUBMITTED','RESUBMITTED'].includes(h.status)?'<button class="btn btn-suc btn-sm" onclick="approveHandover(\''+h.id+'\')">✓</button><button class="btn btn-dan btn-sm" onclick="returnHandover(\''+h.id+'\')">↩</button>':'')
       +(h.status==='APPROVED'?'<button class="btn btn-complete btn-sm" onclick="completeHandover(\''+h.id+'\')">✔Done</button> <button class="btn btn-war btn-sm" onclick="openBudgetUpdate(\''+h.id+'\')">💰</button> <button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Handover\',\''+h.id+'\')">📄</button>':'')
       +(h.status==='COMPLETED'?'<button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Handover\',\''+h.id+'\')">📄</button>':'')
       +(curRole==='manager'?'<button class="btn btn-pri btn-sm" onclick="openEditHandover(\''+h.id+'\')" style="margin-left:2px">✏</button>':'')
-      +'</td></tr>';}).join('')+'</tbody></table></div></div>';
+      +'</td></tr>';}
+  function hoGroup(title,icon,list){return '<div class="card" style="margin-bottom:16px"><div class="card-h"><h4>'+icon+' '+title+'</h4><span class="ch-sub">'+list.length+' รายการ</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Contact</th><th>Warranty</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(list.length?list.map(hoRow).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:16px">— ไม่มีรายการ —</td></tr>')+'</tbody></table></div></div>';}
+  var gDirect=hos.filter(function(h){return h.source!=='LBS'&&h.source!=='EV'});
+  var gLBS=hos.filter(function(h){return h.source==='LBS'});
+  var gEV=hos.filter(function(h){return h.source==='EV'});
+  return bar
+    +hoGroup('Project Handover (สร้างเอง)','📋',gDirect)
+    +hoGroup('อ้างอิงจาก LBS Project · ออก Warranty แล้ว','⚡',gLBS)
+    +hoGroup('อ้างอิงจาก EV Charger Project · ออก Warranty แล้ว','🔌',gEV);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1237,14 +1244,15 @@ function openNewWarrantyLetter(lbsId){
   gsr('serverGetNextWarranty').then(function(no){
     var today=new Date().toISOString().slice(0,10);
     var d={letter_no:no,letter_date:today,recipient:(l.customer_name||'')+(l.location?'\n'+l.location:''),subject:'หนังสือรับประกันผลงาน '+(l.project_name||''),site:l.location||'',attention:l.customer_contact||'',reference:l.job_no+(l.project_name?' — '+l.project_name:''),body:'ตามที่ บริษัท พรีไซซ ซิสเท็ม แอนด์ โปรเจ็ค จำกัด ได้ดำเนินการงาน '+(l.project_name||'')+' ('+l.job_no+') เสร็จสมบูรณ์แล้วนั้น',body2:'บริษัทฯ ขอรับประกันผลงานดังกล่าวตามประเภทและระยะเวลาที่ระบุไว้ด้านล่างนี้',warranty_type:'FULL',warranty_start:today,warranty_end:'',warranty_detail:''};
-    openModal('🛡️ Warranty Official Letter',warrantyFormBody(d),'<button class="btn btn-pri" onclick="createWarrantyLetter(\''+l.job_no+'\')">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
+    openModal('🛡️ Warranty Official Letter',warrantyFormBody(d),'<button class="btn btn-pri" onclick="createWarrantyLetter(\''+l.job_no+'\',\''+l.id+'\')">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
     setTimeout(function(){initSigPad('wl_sig');},80);
   }).catch(function(e){alert('Error: '+e)});
 }
-function createWarrantyLetter(refJob){
+function createWarrantyLetter(refJob,lbsId){
   var data=collectWarranty();data.category='WARRANTY';data.letter_type='EXTERNAL';data.ref_job=refJob;data.sig_image=getSigDataURL('wl_sig');data.created_by=curUser;data.created_at=new Date().toISOString().slice(0,10);
   if(!data.recipient||!data.subject||!data.body){alert('กรุณากรอก ลูกค้า / เรื่อง / เนื้อความ ให้ครบ');return;}
-  showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('❌ '+(r.error||'Error'));return;}return loadAllData().then(function(){hideLoading();closeModal();setLbTab('warranty');alert('✅ ออก Warranty Letter '+r.letter_no+' เรียบร้อย');});}).catch(function(e){hideLoading();alert('Error: '+e)});}
+  var w=DB.lbsWorks.find(function(x){return x.id===lbsId});var src=(w&&w.work_category==='EV')?'EV':'LBS';
+  showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('❌ '+(r.error||'Error'));return;}var promo=lbsId?gsr('serverPromoteHandover',lbsId,src,curUser):Promise.resolve();return promo.then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();setLbTab('warranty');alert('✅ ออก Warranty Letter '+r.letter_no+' + เพิ่มเข้า Project Handover ('+src+') เรียบร้อย');});}).catch(function(e){hideLoading();alert('Error: '+e)});}
 function openEditWarrantyLetter(letterId){
   var lt=DB.letters.find(function(x){return x.id===letterId});if(!lt)return;
   openModal('✏️ แก้ไข Warranty Letter — '+esc(lt.letter_no),warrantyFormBody(lt),'<button class="btn btn-pri" onclick="saveWarrantyLetter(\''+lt.id+'\')">💾 บันทึก</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
