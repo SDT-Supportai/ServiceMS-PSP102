@@ -202,8 +202,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .inbox-card{display:flex;align-items:center;gap:14px;background:var(--bg-card);border:1px solid var(--border-s);border-left:4px solid var(--blue);border-radius:var(--r);padding:13px 16px;transition:.15s}
 .inbox-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
 .inbox-card.k-lbs{border-left-color:var(--orange-st)}
+.inbox-card.k-ev{border-left-color:#16a34a}
 .ic-type{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:6px;background:var(--blue-d);color:var(--blue);white-space:nowrap}
 .ic-type.k-lbs{background:rgba(245,146,11,.1);color:var(--orange-a)}
+.ic-type.k-ev{background:rgba(22,163,74,.12);color:#16a34a}
 .ic-main{flex:1;min-width:0}
 .ic-job{font-family:var(--mono);font-weight:700;font-size:.82rem;color:var(--navy)}
 .ic-proj{font-size:.8rem;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -985,7 +987,7 @@ function agingPill(days){var cls=days>=4?'late':(days>=2?'warn':'fresh');var lbl
 function inboxRows(){
   var rows=[];
   DB.handovers.filter(function(h){return['SUBMITTED','RESUBMITTED'].includes(h.status)}).forEach(function(h){rows.push({kind:'Handovers',klabel:'Handover',id:h.id,job:h.job_no,proj:h.project_name,who:h.project_manager||'—',status:h.status,days:daysSince(h.created_at),att:attachCount(h)});});
-  DB.lbsWorks.filter(function(l){return['SUBMITTED','RESUBMITTED'].includes(l.status)}).forEach(function(l){rows.push({kind:'LBSWorks',klabel:'LBS',id:l.id,job:l.job_no,proj:l.project_name,who:l.project_manager||'—',status:l.status,days:daysSince(l.created_at),att:attachCount(l)});});
+  DB.lbsWorks.filter(function(l){return['SUBMITTED','RESUBMITTED'].includes(l.status)}).forEach(function(l){var isEV=l.work_category==='EV';rows.push({kind:'LBSWorks',cat:isEV?'EV':'LBS',klabel:isEV?'EV':'LBS',id:l.id,job:l.job_no,proj:l.project_name,who:l.project_manager||'—',status:l.status,days:daysSince(l.created_at),att:attachCount(l)});});
   rows.sort(function(a,b){return b.days-a.days});
   return rows;
 }
@@ -993,14 +995,15 @@ function renderApprovalInbox(){
   if(!can('approve'))return '<div class="empty-state"><div class="es-emo">🔒</div><div class="es-txt">เฉพาะ Section / Manager เท่านั้น</div></div>';
   var rows=inboxRows();
   var ho=rows.filter(function(r){return r.kind==='Handovers'});
-  var lb=rows.filter(function(r){return r.kind==='LBSWorks'});
+  var lb=rows.filter(function(r){return r.kind==='LBSWorks'&&r.cat!=='EV'});
+  var ev=rows.filter(function(r){return r.kind==='LBSWorks'&&r.cat==='EV'});
   var late=rows.filter(function(r){return r.days>=4}).length;
   var head='<div class="inbox-head"><h4>📥 Job Under Review</h4><span class="ih-count">'+rows.length+' รายการ</span>'+(late?'<span class="aging late">⏱ ค้างนาน '+late+'</span>':'')+'</div>';
   if(!rows.length)return head+'<div class="empty-state"><div class="es-emo">🎉</div><div class="es-txt">ไม่มีงานรอพิจารณา</div><div class="es-sub">เคลียร์ครบทุกรายการแล้ว</div></div>';
-  return head+inboxBox('Project Handover','&#128203;',ho)+inboxBox('LBS & Support Work','&#9889;',lb);
+  return head+inboxBox('Project Handover','&#128203;',ho)+inboxBox('LBS & Support Work','&#9889;',lb)+inboxBox('EV Charger Work','&#128267;',ev);
 }
 function inboxCard(r){
-  var kl=r.kind==='LBSWorks'?' k-lbs':'';
+  var kl=r.cat==='EV'?' k-ev':(r.kind==='LBSWorks'?' k-lbs':'');
   var open=r.kind==='Handovers'?'showHandoverDetail(\''+r.id+'\')':'showLBSDetail(\''+r.id+'\')';
   return '<div class="inbox-card'+kl+'">'
     +'<span class="ic-type'+kl+'">'+r.klabel+'</span>'
@@ -1206,9 +1209,10 @@ function renderLBSList(){
 
 /* ── Warranty Period tab — issue Warranty Official Letters for completed LBS ── */
 function renderWarrantyPeriod(){
+  var catLbl=lbCat==='EV'?'EV Charger':'LBS';
   var done=DB.lbsWorks.filter(function(l){return l.status==='COMPLETED'&&lbInCat(l)});
   var issued={};(DB.letters||[]).forEach(function(lt){if(lt.category==='WARRANTY'&&lt.ref_job)issued[lt.ref_job]=lt;});
-  if(!done.length)return '<div class="empty-state"><div class="es-emo">🛡️</div><div class="es-txt">ยังไม่มีงาน LBS ที่เสร็จสิ้น</div><div class="es-sub">งานสถานะ COMPLETED จะมาแสดงที่นี่เพื่อออกหนังสือรับประกัน</div></div>';
+  if(!done.length)return '<div class="empty-state"><div class="es-emo">🛡️</div><div class="es-txt">ยังไม่มีงาน '+catLbl+' ที่เสร็จสิ้น</div><div class="es-sub">งานสถานะ COMPLETED จะมาแสดงที่นี่เพื่อออกหนังสือรับประกัน</div></div>';
   var rows=done.map(function(l){
     var lt=issued[l.job_no];
     var act;
@@ -1217,7 +1221,7 @@ function renderWarrantyPeriod(){
     else act='<button class="btn btn-sec btn-sm" onclick="generatePDF(\'Letter\',\''+lt.id+'\')">📄 ดู</button>'+(can('editRecord')?' <button class="btn btn-pri btn-sm" onclick="openEditWarrantyLetter(\''+lt.id+'\')">✏️ แก้ไข</button>':'')+(can('deleteRecord')?' <button class="btn btn-dan btn-sm" onclick="deleteRecord(\'Letters\',\''+lt.id+'\')">🗑 ลบ</button>':'');
     return '<tr><td style="font-family:var(--mono);font-size:.78rem">'+esc(l.job_no)+'</td><td>'+esc(l.project_name)+'</td><td style="font-size:.78rem">'+esc(l.customer_name||'—')+'</td><td style="font-size:.72rem;color:var(--text-2)">'+fmtDate(l.planned_end)+'</td><td>'+(lt?'<span class="sts done">ออกแล้ว · '+esc(lt.letter_no)+'</span>':'<span class="sts submitted">ยังไม่ออก</span>')+'</td><td style="white-space:nowrap">'+act+'</td></tr>';
   }).join('');
-  return '<div class="card"><div class="card-h"><h4>🛡️ Warranty Period — งาน LBS ที่เสร็จสิ้น</h4><span class="ch-sub">'+done.length+' งาน</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Completed</th><th>Warranty Letter</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  return '<div class="card"><div class="card-h"><h4>🛡️ Warranty Period — งาน '+catLbl+' ที่เสร็จสิ้น</h4><span class="ch-sub">'+done.length+' งาน</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Completed</th><th>Warranty Letter</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
 function warrantyFormBody(d){
   function wt(t){return '<option '+(d.warranty_type===t?'selected':'')+'>'+t+'</option>';}
