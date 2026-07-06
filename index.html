@@ -95,11 +95,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .notif-it .nt{font-size:.8rem;font-weight:500}.notif-it .nd{font-size:.7rem;color:var(--text-2);margin-top:2px}.notif-it .nm{font-size:.62rem;color:var(--text-3);margin-top:3px}
 
 /* ═══════════════ DASHBOARD v5.6 ═══════════════ */
-.dash-top-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.dash-top-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
 .stat-card{background:var(--bg-w);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden;transition:.25s}
 .stat-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:var(--shadow-md)}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
-.stat-card.card-ho::before{background:linear-gradient(90deg,var(--navy),var(--blue))}.stat-card.card-rp::before{background:linear-gradient(90deg,var(--orange-st),#fbbf24)}.stat-card.card-lb::before{background:linear-gradient(90deg,var(--green-st),#6ee7b7)}
+.stat-card.card-ho::before{background:linear-gradient(90deg,var(--navy),var(--blue))}.stat-card.card-rp::before{background:linear-gradient(90deg,var(--orange-st),#fbbf24)}.stat-card.card-lb::before{background:linear-gradient(90deg,var(--green-st),#6ee7b7)}.stat-card.card-ev::before{background:linear-gradient(90deg,#7c3aed,#a78bfa)}
 .stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .stat-top .st-label{font-size:.78rem;color:var(--text-2);font-weight:500}
 .stat-top .st-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem}
@@ -202,10 +202,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .inbox-card{display:flex;align-items:center;gap:14px;background:var(--bg-card);border:1px solid var(--border-s);border-left:4px solid var(--blue);border-radius:var(--r);padding:13px 16px;transition:.15s}
 .inbox-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
 .inbox-card.k-lbs{border-left-color:var(--orange-st)}
-.inbox-card.k-ev{border-left-color:#16a34a}
+.inbox-card.k-ev{border-left-color:#7c3aed}
 .ic-type{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:6px;background:var(--blue-d);color:var(--blue);white-space:nowrap}
 .ic-type.k-lbs{background:rgba(245,146,11,.1);color:var(--orange-a)}
-.ic-type.k-ev{background:rgba(22,163,74,.12);color:#16a34a}
+.ic-type.k-ev{background:rgba(124,58,237,.12);color:#7c3aed}
 .ic-main{flex:1;min-width:0}
 .ic-job{font-family:var(--mono);font-weight:700;font-size:.82rem;color:var(--navy)}
 .ic-proj{font-size:.8rem;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -751,7 +751,9 @@ function renderDashboard(){
   var now=new Date(),nowISO=now.toISOString().slice(0,10);
   var hoTotal=DB.handovers.length,hoInW=DB.handovers.filter(function(h){return h.status==='APPROVED'&&parseISO(h.warranty_end)>=nowISO}).length,hoDone=DB.handovers.filter(function(h){return(h.status==='APPROVED'&&parseISO(h.warranty_end)<nowISO)||h.status==='COMPLETED'}).length,hoPend=DB.handovers.filter(function(h){return h.status==='SUBMITTED'||h.status==='RESUBMITTED'}).length;
   var rpTotal=DB.serviceOrders.length,rpAssigned=DB.serviceOrders.filter(function(s){return s.status==='IN_PROGRESS'}).length,rpDone=DB.serviceOrders.filter(function(s){return s.status==='DONE'}).length,rpPend=DB.serviceOrders.filter(function(s){return s.status==='PENDING'}).length;
-  var lbTotal=DB.lbsWorks.length,lbAssigned=DB.lbsWorks.filter(function(l){return l.status==='ASSIGNED'}).length,lbDone=DB.lbsWorks.filter(function(l){return l.status==='COMPLETED'}).length,lbPend=DB.lbsWorks.filter(function(l){return l.status==='SUBMITTED'||l.status==='RESUBMITTED'}).length;
+  var lbsArr=DB.lbsWorks.filter(function(l){return l.work_category!=='EV'}),evArr=DB.lbsWorks.filter(function(l){return l.work_category==='EV'});
+  var lbTotal=lbsArr.length,lbAssigned=lbsArr.filter(function(l){return l.status==='ASSIGNED'}).length,lbDone=lbsArr.filter(function(l){return l.status==='COMPLETED'}).length,lbPend=lbsArr.filter(function(l){return l.status==='SUBMITTED'||l.status==='RESUBMITTED'}).length;
+  var evTotal=evArr.length,evAssigned=evArr.filter(function(l){return l.status==='ASSIGNED'}).length,evDone=evArr.filter(function(l){return l.status==='COMPLETED'}).length,evPend=evArr.filter(function(l){return l.status==='SUBMITTED'||l.status==='RESUBMITTED'}).length;
   // Appointments
   var appts=[];
   DB.serviceOrders.filter(function(s){return s.status!=='DONE'}).forEach(function(so){var ho=DB.handovers.find(function(h){return h.job_no===so.ref_job_no});var startISO=parseISO(so.planned_start);var du=Math.ceil((new Date(startISO)-now)/864e5);var names=Array.isArray(so.assigned_team)?so.assigned_team.map(function(id){return getTeamName(id)}).join(', '):'';appts.push({type:'repair',date:startISO,title:so.description,meta:so.so_no+' · '+(ho?ho.project_name:'')+(names?' · '+names:''),du:du,end:parseISO(so.planned_finish)});});
@@ -778,6 +780,7 @@ function renderDashboard(){
     +'<div class="stat-card card-ho"><div class="stat-top"><span class="st-label">Project Handovers</span><div class="st-icon" style="background:rgba(26,39,68,.06);color:var(--navy)">&#128203;</div></div><div class="stat-total">'+hoTotal+'</div><div class="stat-subs"><div class="stat-sub"><div class="ss-val" style="color:var(--green-st)">'+hoInW+'</div><div class="ss-lbl">In Warranty</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--text-3)">'+hoDone+'</div><div class="ss-lbl">Completed</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--orange-a)">'+hoPend+'</div><div class="ss-lbl">Pending</div></div></div></div>'
     +'<div class="stat-card card-rp"><div class="stat-top"><span class="st-label">Repair Requests</span><div class="st-icon" style="background:rgba(245,146,11,.08);color:var(--orange-st)">&#128295;</div></div><div class="stat-total">'+rpTotal+'</div><div class="stat-subs"><div class="stat-sub"><div class="ss-val" style="color:var(--blue)">'+rpAssigned+'</div><div class="ss-lbl">Assigned</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--green-st)">'+rpDone+'</div><div class="ss-lbl">Completed</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--orange-a)">'+rpPend+'</div><div class="ss-lbl">Pending</div></div></div></div>'
     +'<div class="stat-card card-lb"><div class="stat-top"><span class="st-label">LBS & Support</span><div class="st-icon" style="background:rgba(40,167,69,.08);color:var(--green-st)">&#9889;</div></div><div class="stat-total">'+lbTotal+'</div><div class="stat-subs"><div class="stat-sub"><div class="ss-val" style="color:var(--blue)">'+lbAssigned+'</div><div class="ss-lbl">Assigned</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--green-st)">'+lbDone+'</div><div class="ss-lbl">Completed</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--orange-a)">'+lbPend+'</div><div class="ss-lbl">Pending</div></div></div></div>'
+    +'<div class="stat-card card-ev"><div class="stat-top"><span class="st-label">EV Charger</span><div class="st-icon" style="background:rgba(124,58,237,.08);color:#7c3aed">&#128268;</div></div><div class="stat-total">'+evTotal+'</div><div class="stat-subs"><div class="stat-sub"><div class="ss-val" style="color:var(--blue)">'+evAssigned+'</div><div class="ss-lbl">Assigned</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--green-st)">'+evDone+'</div><div class="ss-lbl">Completed</div></div><div class="stat-sub"><div class="ss-val" style="color:var(--orange-a)">'+evPend+'</div><div class="ss-lbl">Pending</div></div></div></div>'
     +'</div>'
     +'<!-- FULL-WIDTH CALENDAR (moved above appointments) -->'
     +'<div class="dash-cal-row">'
@@ -1000,7 +1003,7 @@ function renderApprovalInbox(){
   var late=rows.filter(function(r){return r.days>=4}).length;
   var head='<div class="inbox-head"><h4>📥 Job Under Review</h4><span class="ih-count">'+rows.length+' รายการ</span>'+(late?'<span class="aging late">⏱ ค้างนาน '+late+'</span>':'')+'</div>';
   if(!rows.length)return head+'<div class="empty-state"><div class="es-emo">🎉</div><div class="es-txt">ไม่มีงานรอพิจารณา</div><div class="es-sub">เคลียร์ครบทุกรายการแล้ว</div></div>';
-  return head+inboxBox('Project Handover','&#128203;',ho)+inboxBox('LBS & Support Work','&#9889;',lb)+inboxBox('EV Charger Work','&#128267;',ev);
+  return head+inboxBox('Project Handover','&#128203;',ho,'ho')+inboxBox('LBS & Support Work','&#9889;',lb,'lb')+inboxBox('EV Charger Work','&#128267;',ev,'ev');
 }
 function inboxCard(r){
   var kl=r.cat==='EV'?' k-ev':(r.kind==='LBSWorks'?' k-lbs':'');
@@ -1019,10 +1022,11 @@ function inboxCard(r){
       +'<button class="btn btn-sec btn-sm" onclick="'+open+'">👁</button>'
     +'</div></div>';
 }
-function inboxBox(title,icon,rows){
+function inboxBox(title,icon,rows,key){
+  var bid='ibx-'+key;
   var inner=rows.length?'<div class="inbox-grid">'+rows.map(inboxCard).join('')+'</div>'
     :'<div class="empty-state" style="padding:22px"><div class="es-sub">— ไม่มีงานรอพิจารณา —</div></div>';
-  return '<div class="card" style="margin-bottom:16px"><div class="card-h"><h4>'+icon+' '+title+'</h4><span class="ch-sub">'+rows.length+' รายการ</span></div><div class="card-b">'+inner+'</div></div>';
+  return '<div class="collapse-hdr" onclick="toggleCollapse(\''+bid+'\',this)"><div class="ch-left"><span class="ch-title">'+icon+' '+title+'</span><span class="ch-count">'+rows.length+' รายการ</span></div><span class="ch-arrow">▼</span></div><div class="collapse-body" id="'+bid+'">'+inner+'</div>';
 }
 function quickApprove(sheet,id){if(!can('approve')){alert('ไม่มีสิทธิ์');return;}var rec=(sheet==='Handovers'?DB.handovers:DB.lbsWorks).find(function(x){return x.id===id});var job=rec&&rec.job_no?rec.job_no:id;if(!confirm('ยืนยันอนุมัติ '+job+' ?'))return;showLoading('Approving...');gsr('serverApprove',sheet,id,curUser).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});}
 function openReturnModal(sheet,id){
@@ -1094,14 +1098,14 @@ function renderHandoverList(){
       +(h.status==='COMPLETED'?'<button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Handover\',\''+h.id+'\')">📄</button>':'')
       +(curRole==='manager'?'<button class="btn btn-pri btn-sm" onclick="openEditHandover(\''+h.id+'\')" style="margin-left:2px">✏</button>':'')
       +'</td></tr>';}
-  function hoGroup(title,icon,list){return '<div class="card" style="margin-bottom:16px"><div class="card-h"><h4>'+icon+' '+title+'</h4><span class="ch-sub">'+list.length+' รายการ</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Contact</th><th>Warranty</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(list.length?list.map(hoRow).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:16px">— ไม่มีรายการ —</td></tr>')+'</tbody></table></div></div>';}
+  function hoGroup(title,icon,list,key){var bid='hog-'+key;return '<div class="collapse-hdr" onclick="toggleCollapse(\''+bid+'\',this)"><div class="ch-left"><span class="ch-title">'+icon+' '+title+'</span><span class="ch-count">'+list.length+' รายการ</span></div><span class="ch-arrow">▼</span></div><div class="collapse-body" id="'+bid+'" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Contact</th><th>Warranty</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(list.length?list.map(hoRow).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--text-3);padding:16px">— ไม่มีรายการ —</td></tr>')+'</tbody></table></div>';}
   var gDirect=hos.filter(function(h){return h.source!=='LBS'&&h.source!=='EV'});
   var gLBS=hos.filter(function(h){return h.source==='LBS'});
   var gEV=hos.filter(function(h){return h.source==='EV'});
   return bar
-    +hoGroup('Project Handover (สร้างเอง)','📋',gDirect)
-    +hoGroup('อ้างอิงจาก LBS Project · ออก Warranty แล้ว','⚡',gLBS)
-    +hoGroup('อ้างอิงจาก EV Charger Project · ออก Warranty แล้ว','🔌',gEV);
+    +hoGroup('Project Handover (สร้างเอง)','📋',gDirect,'direct')
+    +hoGroup('อ้างอิงจาก LBS Project · ออก Warranty แล้ว','⚡',gLBS,'lbs')
+    +hoGroup('อ้างอิงจาก EV Charger Project · ออก Warranty แล้ว','🔌',gEV,'ev');
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1201,9 +1205,10 @@ function renderLBSList(){
   var tab=lbSubTab||'lbs';
   var bar='<div class="stabs" style="margin-bottom:14px">'+lbTabBtn(tab,'lbs',lbCat==='EV'?'🔌 EV Work':'⚡ LBS Work')+lbTabBtn(tab,'completed','✅ Completed Work')+lbTabBtn(tab,'warranty','🛡️ Warranty Period')+'</div>';
   if(tab==='warranty')return bar+renderWarrantyPeriod();
-  if(tab==='completed')return bar+'<div class="card"><div class="card-h"><h4>✅ Completed Works</h4><span class="ch-sub">'+completed.length+' items</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Type</th><th>Schedule</th><th>Team</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+completed.map(lbsRow).join('')+'</tbody></table>'+(completed.length===0?'<p style="text-align:center;padding:20px;color:var(--text-3);font-size:.82rem">No completed works</p>':'')+'</div></div>';
-  return bar+'<div class="filter-bar"><input placeholder="🔍 Search..." style="width:200px" oninput="filterTable(this,\'lbTbl\')"><select onchange="filterTableStatus(this,\'lbTbl\')"><option value="">All Status</option><option>APPROVED</option><option>ASSIGNED</option><option>RETURNED</option></select></div>'
-    +'<div class="card"><div class="card-h"><h4>&#9889; Active Works</h4><span class="ch-sub">'+active.length+' items</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl" id="lbTbl"><thead><tr><th>Job No.</th><th>Project</th><th>Type</th><th>Schedule</th><th>Team</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
+  if(tab==='completed')return bar+'<div class="collapse-hdr" onclick="toggleCollapse(\'lbCompletedBody\',this)"><div class="ch-left"><span class="ch-title">✅ Completed Works</span><span class="ch-count">'+completed.length+' items</span></div><span class="ch-arrow">▼</span></div><div class="collapse-body" id="lbCompletedBody" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Type</th><th>Schedule</th><th>Team</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+completed.map(lbsRow).join('')+'</tbody></table>'+(completed.length===0?'<p style="text-align:center;padding:20px;color:var(--text-3);font-size:.82rem">No completed works</p>':'')+'</div>';
+  return bar+'<div class="collapse-hdr" onclick="toggleCollapse(\'lbActiveBody\',this)"><div class="ch-left"><span class="ch-title">&#9889; Active Works</span><span class="ch-count">'+active.length+' items</span></div><span class="ch-arrow">▼</span></div>'
+    +'<div class="collapse-body" id="lbActiveBody"><div class="filter-bar"><input placeholder="🔍 Search..." style="width:200px" oninput="filterTable(this,\'lbTbl\')"><select onchange="filterTableStatus(this,\'lbTbl\')"><option value="">All Status</option><option>APPROVED</option><option>ASSIGNED</option><option>RETURNED</option></select></div>'
+    +'<div style="overflow-x:auto"><table class="dtbl" id="lbTbl"><thead><tr><th>Job No.</th><th>Project</th><th>Type</th><th>Schedule</th><th>Team</th><th>Status</th><th>Actions</th></tr></thead><tbody>'
     +active.map(lbsRow).join('')+'</tbody></table>'+(active.length===0?'<p style="text-align:center;padding:20px;color:var(--text-3);font-size:.82rem">No active works</p>':'')+'</div></div>';
 }
 
@@ -1221,7 +1226,7 @@ function renderWarrantyPeriod(){
     else act='<button class="btn btn-sec btn-sm" onclick="generatePDF(\'Letter\',\''+lt.id+'\')">📄 ดู</button>'+(can('editRecord')?' <button class="btn btn-pri btn-sm" onclick="openEditWarrantyLetter(\''+lt.id+'\')">✏️ แก้ไข</button>':'')+(can('deleteRecord')?' <button class="btn btn-dan btn-sm" onclick="deleteRecord(\'Letters\',\''+lt.id+'\')">🗑 ลบ</button>':'');
     return '<tr><td style="font-family:var(--mono);font-size:.78rem">'+esc(l.job_no)+'</td><td>'+esc(l.project_name)+'</td><td style="font-size:.78rem">'+esc(l.customer_name||'—')+'</td><td style="font-size:.72rem;color:var(--text-2)">'+fmtDate(l.planned_end)+'</td><td>'+(lt?'<span class="sts done">ออกแล้ว · '+esc(lt.letter_no)+'</span>':'<span class="sts submitted">ยังไม่ออก</span>')+'</td><td style="white-space:nowrap">'+act+'</td></tr>';
   }).join('');
-  return '<div class="card"><div class="card-h"><h4>🛡️ Warranty Period — งาน '+catLbl+' ที่เสร็จสิ้น</h4><span class="ch-sub">'+done.length+' งาน</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Completed</th><th>Warranty Letter</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  return '<div class="collapse-hdr" onclick="toggleCollapse(\'lbWarrantyBody\',this)"><div class="ch-left"><span class="ch-title">🛡️ Warranty Period — งาน '+catLbl+' ที่เสร็จสิ้น</span><span class="ch-count">'+done.length+' งาน</span></div><span class="ch-arrow">▼</span></div><div class="collapse-body" id="lbWarrantyBody" style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Job No.</th><th>Project</th><th>Customer</th><th>Completed</th><th>Warranty Letter</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function warrantyFormBody(d){
   function wt(t){return '<option '+(d.warranty_type===t?'selected':'')+'>'+t+'</option>';}
