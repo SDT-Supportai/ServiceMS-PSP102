@@ -183,7 +183,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .sts{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.68rem;font-weight:600}
 .sts.submitted,.sts.pending{background:rgba(245,146,11,.1);color:var(--orange-a)}
 .sts.approved,.sts.done,.sts.completed{background:var(--green-s);color:var(--green-a)}
-.sts.in_progress,.sts.resubmitted,.sts.assigned{background:var(--blue-d);color:var(--blue)}
+.sts.in_progress,.sts.resubmitted,.sts.assigned,.sts.forwarded{background:var(--blue-d);color:var(--blue)}
 .sts.returned,.sts.rejected{background:var(--red-d);color:var(--red)}.sts.draft{background:var(--bg-elevated);color:var(--text-3)}
 /* attachment link + copyable URL (Customer Engagement / ปรับปรุงลิ้งค์ให้ copy ได้) */
 .attach-item{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0}
@@ -1199,6 +1199,7 @@ function showCustomerRequestDetail(id){
   body+='<div class="detail-section-title">🔗 '+(isReg?'เอกสาร Warranty Period Doc.':'ไฟล์/รูปประกอบการแจ้งซ่อม')+'</div>';
   body+='<div class="detail-attach"><div class="da-label">ไฟล์แนบ / Attachments</div>'+attachListHtml(c)+'</div>';
   if(c.status==='REJECTED'&&c.reject_reason){body+='<div class="detail-section-title">❌ เหตุผลการปฏิเสธ</div><div class="detail-return-comment"><div class="dc-label">เหตุผล</div><div class="dc-text">'+esc(c.reject_reason)+'</div></div>';}
+  if(c.status==='FORWARDED'){body+='<div style="background:var(--blue-d);border:1px solid rgba(45,127,249,.25);border-radius:var(--r-sm);padding:9px 12px;margin-top:12px;font-size:.78rem;color:var(--blue)">📥 ส่งเข้า Job Under Review แล้ว (Job No: '+esc(c.result_ref||'—')+') — รอ Manager อนุมัติขั้นสุดท้าย ระบบจะแจ้ง Job No. ให้ลูกค้าทาง LINE เมื่ออนุมัติ</div>';}
   var footer='';
   if(c.status==='PENDING'){
     if(canScreenCust(c.kind))footer+='<button class="btn btn-suc" onclick="closeModal();openApproveCustomerRequest(\''+c.id+'\')">'+(isReg?'✅ ตรวจ & ส่งเข้าพิจารณา':'✅ อนุมัติ')+'</button>';
