@@ -171,7 +171,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .cal-d.has-ev{cursor:pointer}.cal-d.has-ev:hover{border-color:var(--blue);background:var(--blue-d);transform:scale(1.02);box-shadow:var(--shadow-sm)}
 .cal-d.today{background:var(--blue-d);border-color:var(--blue)}.cal-d.today .dn{color:var(--blue);font-weight:700}
 .cal-ev{font-size:.55rem;padding:2px 4px;border-radius:2px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
-.cal-ev.repair{background:rgba(45,127,249,.1);color:var(--blue)}.cal-ev.lbs{background:rgba(245,146,11,.1);color:var(--orange-a)}
+.cal-ev.repair{background:rgba(45,127,249,.1);color:var(--blue)}.cal-ev.lbs{background:rgba(245,146,11,.1);color:var(--orange-a)}.cal-ev.ev{background:rgba(40,167,69,.14);color:var(--green-a)}
 .cal-legend{display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-s)}
 .cal-leg-item{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--text-2)}
 .cal-leg-dot{width:10px;height:10px;border-radius:2px}
@@ -830,21 +830,21 @@ function buildDashCal(){
   var now=new Date(),todayStr=now.toISOString().slice(0,10);
   var events=[];
   DB.serviceOrders.filter(function(s){return s.status!=='DONE'}).forEach(function(so){var team=Array.isArray(so.assigned_team)?so.assigned_team:[];var ho=DB.handovers.find(function(h){return h.job_no===so.ref_job_no});team.forEach(function(tid){events.push({start:parseISO(so.planned_start),end:parseISO(so.planned_finish),label:so.so_no+' '+getTeamName(tid),type:'repair',job:so.so_no,desc:so.description,project:ho?ho.project_name:'',teamName:getTeamName(tid)});});});
-  DB.lbsWorks.filter(function(l){return l.status==='ASSIGNED'}).forEach(function(lb){var team=Array.isArray(lb.assigned_team)?lb.assigned_team:[];team.forEach(function(tid){events.push({start:parseISO(lb.planned_start),end:parseISO(lb.planned_end),label:lb.job_no+' '+getTeamName(tid),type:'lbs',job:lb.job_no,desc:lb.project_name,project:lb.project_name,teamName:getTeamName(tid)});});});
+  DB.lbsWorks.filter(function(l){return l.status==='ASSIGNED'}).forEach(function(lb){var team=Array.isArray(lb.assigned_team)?lb.assigned_team:[];var evType=lb.work_category==='EV'?'ev':'lbs';team.forEach(function(tid){events.push({start:parseISO(lb.planned_start),end:parseISO(lb.planned_end),label:lb.job_no+' '+getTeamName(tid),type:evType,job:lb.job_no,desc:lb.project_name,project:lb.project_name,teamName:getTeamName(tid)});});});
   var grid='<div class="cal-grid">';
   dNames.forEach(function(d){grid+='<div class="cal-dh">'+d+'</div>';});
   for(var i=0;i<fd;i++){grid+='<div class="cal-d om"><div class="dn">'+(pdim-fd+i+1)+'</div></div>';}
   for(var d=1;d<=dim;d++){var ds=yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var isToday=ds===todayStr;var dayEv=events.filter(function(e){return ds>=e.start&&ds<=e.end});var hasEv=dayEv.length>0;grid+='<div class="cal-d '+(isToday?'today':'')+' '+(hasEv?'has-ev':'')+'" '+(hasEv?'onclick="showDashDayEvents(\''+ds+'\')" style="cursor:pointer"':'')+'>'+' <div class="dn">'+d+(hasEv?'<span style="display:inline-block;margin-left:3px;background:var(--blue);color:#fff;font-size:.5rem;padding:0 3px;border-radius:8px;font-weight:700;vertical-align:middle">'+dayEv.length+'</span>':'')+'</div>';dayEv.slice(0,2).forEach(function(e){grid+='<div class="cal-ev '+e.type+'"><span class="ce-job">'+esc(e.job||e.so_no||'')+'</span><span class="ce-asg">'+esc(e.teamName||'')+'</span></div>';});if(dayEv.length>2)grid+='<div style="font-size:.55rem;color:var(--text-3)">+'+(dayEv.length-2)+' more</div>';grid+='</div>';}
   var rem=(fd+dim)%7;if(rem>0)for(var j=1;j<=7-rem;j++){grid+='<div class="cal-d om"><div class="dn">'+j+'</div></div>';}
-  grid+='</div><div class="cal-legend"><div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(45,127,249,.3)"></div> Repair / Service Order</div><div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(245,146,11,.3)"></div> LBS Work</div></div>';
+  grid+='</div><div class="cal-legend"><div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(45,127,249,.3)"></div> Repair / Service Order</div><div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(245,146,11,.3)"></div> LBS Work</div><div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(40,167,69,.4)"></div> EV Charger</div></div>';
   return {monthLabel:mNames[mo]+' '+yr,grid:grid};
 }
 
 function showDashDayEvents(dateStr){
   var evs=[];
   DB.serviceOrders.filter(function(s){return s.status!=='DONE'}).forEach(function(so){var st=parseISO(so.planned_start),en=parseISO(so.planned_finish);if(dateStr>=st&&dateStr<=en){var names=Array.isArray(so.assigned_team)?so.assigned_team.map(function(id){return getTeamName(id)}).join(', '):'Unassigned';evs.push({type:'repair',no:so.so_no,title:so.description,team:names,start:st,end:en,status:so.status});}});
-  DB.lbsWorks.filter(function(l){return l.status==='ASSIGNED'}).forEach(function(lb){var st=parseISO(lb.planned_start),en=parseISO(lb.planned_end);if(dateStr>=st&&dateStr<=en){var names=Array.isArray(lb.assigned_team)?lb.assigned_team.filter(Boolean).map(function(id){return getTeamName(id)}).join(', '):'—';evs.push({type:'lbs',no:lb.job_no,title:lb.project_name,team:names,start:st,end:en,status:lb.status});}});
-  var body=evs.length?evs.map(function(e){return '<div style="padding:12px;background:var(--bg-surface);border-radius:var(--r-sm);border-left:3px solid '+(e.type==='repair'?'var(--blue)':'var(--orange-st)')+';margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="sts '+stsCls(e.status)+'">'+e.status+'</span><span style="font-family:var(--mono);font-size:.78rem;font-weight:600">'+esc(e.no)+'</span></div><div style="font-size:.85rem;font-weight:500">'+esc(e.title)+'</div><div style="font-size:.72rem;color:var(--text-2);margin-top:3px">Team: '+esc(e.team)+'</div><div style="font-size:.68rem;color:var(--text-3);margin-top:3px">'+fmtDate(e.start)+' → '+fmtDate(e.end)+'</div></div>';}).join(''):'<p style="color:var(--text-3);text-align:center;padding:20px">No events on this day</p>';
+  DB.lbsWorks.filter(function(l){return l.status==='ASSIGNED'}).forEach(function(lb){var st=parseISO(lb.planned_start),en=parseISO(lb.planned_end);if(dateStr>=st&&dateStr<=en){var names=Array.isArray(lb.assigned_team)?lb.assigned_team.filter(Boolean).map(function(id){return getTeamName(id)}).join(', '):'—';evs.push({type:lb.work_category==='EV'?'ev':'lbs',no:lb.job_no,title:lb.project_name,team:names,start:st,end:en,status:lb.status});}});
+  var body=evs.length?evs.map(function(e){return '<div style="padding:12px;background:var(--bg-surface);border-radius:var(--r-sm);border-left:3px solid '+(e.type==='repair'?'var(--blue)':e.type==='ev'?'var(--green-a)':'var(--orange-st)')+';margin-bottom:8px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="sts '+stsCls(e.status)+'">'+e.status+'</span><span style="font-family:var(--mono);font-size:.78rem;font-weight:600">'+esc(e.no)+'</span></div><div style="font-size:.85rem;font-weight:500">'+esc(e.title)+'</div><div style="font-size:.72rem;color:var(--text-2);margin-top:3px">Team: '+esc(e.team)+'</div><div style="font-size:.68rem;color:var(--text-3);margin-top:3px">'+fmtDate(e.start)+' → '+fmtDate(e.end)+'</div></div>';}).join(''):'<p style="color:var(--text-3);text-align:center;padding:20px">No events on this day</p>';
   openModal('Events — '+fmtDate(dateStr),body,'<button class="btn btn-sec" onclick="closeModal()">Close</button>');
 }
 
@@ -1537,21 +1537,67 @@ function jobProgress(start,end){var now=new Date().toISOString().slice(0,10);if(
 function renderTeamManagement(){
   var teamCards=DB.team.map(function(t){var ini=t.name.split(' ').map(function(n){return n[0]}).join('');var soTasks=DB.serviceOrders.filter(function(so){return Array.isArray(so.assigned_team)&&so.assigned_team.includes(t.psp_id)&&so.status!=='DONE'});var lbsTasks=DB.lbsWorks.filter(function(l){return Array.isArray(l.assigned_team)&&l.assigned_team.includes(t.psp_id)&&l.status==='ASSIGNED'});var allTasks=soTasks.map(function(s){return{no:s.so_no,type:'repair'}}).concat(lbsTasks.map(function(l){return{no:l.job_no,type:'lbs'}}));var busy=allTasks.length>0;return '<div class="tm-card">'+teamAv(t)+'<div class="tm-nm">'+esc(t.name)+'</div><div class="tm-pos">'+esc(t.position)+'</div><div style="font-size:.65rem;color:var(--text-3);margin-top:2px">'+esc(t.psp_id)+'</div><button class="tm-photo-btn" onclick="openTeamPhoto(\''+t.psp_id+'\')">📷 รูป</button>'+(curRole==='manager'?'<button class="tm-photo-btn" onclick="openEditTeam(\''+t.psp_id+'\')">✏️</button> <button class="tm-photo-btn" style="border-color:#fb7185;color:#e53e3e" onclick="deleteRecord(\'Team\',\''+t.psp_id+'\')">🗑</button>':'')+'<div class="tm-status '+(busy?'busy':'avail')+'">'+(busy?'Assigned ('+allTasks.length+')':'Available')+'</div>'+(busy?'<div class="tm-task">'+allTasks.map(function(tk){return '<span style="display:inline-block;padding:1px 5px;background:'+(tk.type==='repair'?'var(--blue-d)':'rgba(245,146,11,.1)')+';color:'+(tk.type==='repair'?'var(--blue)':'var(--orange-a)')+';border-radius:3px;font-size:.58rem;font-weight:600;margin:1px 2px">'+esc(tk.no)+'</span>'}).join('')+'</div>':'')+'</div>';}).join('');
   // per-person work schedule (Service & Scheduling)
-  var sched=DB.team.map(function(t){
+  var sched=buildTeamSchedule();
+  var schedHtml=sched.map(function(m){
+    var rows=m.jobs.length?m.jobs.map(function(j){return '<tr><td style="font-family:var(--mono);font-size:.76rem">'+esc(j.no)+'</td><td><span class="sts '+(j.type==='repair'?'in_progress':j.type==='ev'?'done':'assigned')+'" style="font-size:.58rem">'+(j.type==='repair'?'REPAIR':j.type==='ev'?'EV':'LBS')+'</span></td><td style="font-size:.8rem">'+esc(j.title||'—')+'</td><td style="font-size:.72rem;color:var(--text-2);white-space:nowrap">'+fmtDate(j.start)+' → '+fmtDate(j.end)+'</td><td>'+jobProgress(j.start,j.end)+'</td></tr>';}).join('')
+      :'<tr><td colspan="5" style="text-align:center;color:var(--text-3);font-size:.78rem;padding:10px">— ว่าง / Available —</td></tr>';
+    return '<div class="card" style="margin-bottom:12px"><div class="card-h" style="gap:10px"><label class="sch-pick" style="display:flex;align-items:center;margin:0" title="เลือกเพื่อพิมพ์"><input type="checkbox" class="sch-chk" value="'+esc(m.t.psp_id)+'" style="width:17px;height:17px;cursor:pointer"></label>'+teamAv(m.t)+'<div style="flex:1"><h4 style="margin:0">'+esc(m.t.name)+'</h4><div style="font-size:.64rem;color:var(--text-3)">'+esc(m.t.position||'')+' · '+esc(m.t.psp_id)+'</div></div><span class="ch-sub">'+m.jobs.length+' งาน</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl" style="width:100%"><thead><tr><th>Job No.</th><th>Type</th><th>Title</th><th>Schedule</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  }).join('');
+  var schedTools='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--text-2);cursor:pointer"><input type="checkbox" id="schSelAll" onchange="schToggleAll(this)" style="width:16px;height:16px"> เลือกทั้งหมด</label><button class="btn btn-pdf btn-sm" onclick="printSchedule()">🖨️ พิมพ์ตารางที่เลือก (PDF)</button></div>';
+  return '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"><button class="btn btn-pri" onclick="assignRepair()">🔧 Assign Repair</button><button class="btn btn-war" onclick="assignLBS()">⚡ Assign LBS</button><button class="btn btn-war" onclick="assignEV()">🔌 Assign EV</button><button class="btn btn-suc" onclick="openAddTeamMember()">+ Add Member</button></div>'
+    +'<div class="card" style="margin-bottom:16px"><div class="card-h" style="flex-wrap:wrap;gap:8px"><h4 style="margin:0">📋 Service &amp; Scheduling (รายบุคคล)</h4><span class="ch-sub" style="margin-right:auto">'+DB.team.length+' คน</span>'+schedTools+'</div><div class="card-b">'+(schedHtml||'<div class="empty-state" style="padding:22px"><div class="es-sub">— ยังไม่มีทีมงาน —</div></div>')+'</div></div>'
+    +'<div class="card"><div class="card-h"><h4>👥 Team Members</h4></div><div class="card-b"><div class="team-strip">'+teamCards+'</div></div></div>';
+}
+// สร้างตารางงานรายบุคคล (ใช้ร่วมกันระหว่างการแสดงผลและการพิมพ์ PDF)
+function buildTeamSchedule(){
+  return DB.team.map(function(t){
     var jobs=[];
     DB.serviceOrders.filter(function(so){return Array.isArray(so.assigned_team)&&so.assigned_team.indexOf(t.psp_id)>-1&&so.status!=='DONE'}).forEach(function(so){var ho=DB.handovers.find(function(h){return h.job_no===so.ref_job_no});jobs.push({no:so.so_no,type:'repair',title:so.description||(ho?ho.project_name:''),start:parseISO(so.planned_start),end:parseISO(so.planned_finish)});});
-    DB.lbsWorks.filter(function(l){return Array.isArray(l.assigned_team)&&l.assigned_team.indexOf(t.psp_id)>-1&&l.status==='ASSIGNED'}).forEach(function(l){jobs.push({no:l.job_no,type:'lbs',title:l.project_name,start:parseISO(l.planned_start),end:parseISO(l.planned_end)});});
+    DB.lbsWorks.filter(function(l){return Array.isArray(l.assigned_team)&&l.assigned_team.indexOf(t.psp_id)>-1&&l.status==='ASSIGNED'}).forEach(function(l){jobs.push({no:l.job_no,type:l.work_category==='EV'?'ev':'lbs',title:l.project_name,start:parseISO(l.planned_start),end:parseISO(l.planned_end)});});
     jobs.sort(function(a,b){return (a.start||'').localeCompare(b.start||'')});
     return {t:t,jobs:jobs};
   });
-  var schedHtml=sched.map(function(m){
-    var rows=m.jobs.length?m.jobs.map(function(j){return '<tr><td style="font-family:var(--mono);font-size:.76rem">'+esc(j.no)+'</td><td><span class="sts '+(j.type==='repair'?'in_progress':'assigned')+'" style="font-size:.58rem">'+(j.type==='repair'?'REPAIR':'LBS')+'</span></td><td style="font-size:.8rem">'+esc(j.title||'—')+'</td><td style="font-size:.72rem;color:var(--text-2);white-space:nowrap">'+fmtDate(j.start)+' → '+fmtDate(j.end)+'</td><td>'+jobProgress(j.start,j.end)+'</td></tr>';}).join('')
-      :'<tr><td colspan="5" style="text-align:center;color:var(--text-3);font-size:.78rem;padding:10px">— ว่าง / Available —</td></tr>';
-    return '<div class="card" style="margin-bottom:12px"><div class="card-h" style="gap:10px">'+teamAv(m.t)+'<div style="flex:1"><h4 style="margin:0">'+esc(m.t.name)+'</h4><div style="font-size:.64rem;color:var(--text-3)">'+esc(m.t.position||'')+' · '+esc(m.t.psp_id)+'</div></div><span class="ch-sub">'+m.jobs.length+' งาน</span></div><div class="card-b" style="overflow-x:auto"><table class="dtbl" style="width:100%"><thead><tr><th>Job No.</th><th>Type</th><th>Title</th><th>Schedule</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+function schToggleAll(cb){document.querySelectorAll('.sch-chk').forEach(function(c){c.checked=cb.checked;});}
+// สถานะงานแบบข้อความล้วน (สำหรับพิมพ์) — คู่กับ jobProgress ที่คืน HTML
+function jobProgressText(start,end){var now=new Date().toISOString().slice(0,10);if(end&&now>end)return 'OVERDUE';if(start&&now>=start)return 'IN PROGRESS';return 'SCHEDULED';}
+function printSchedule(){
+  var picked=Array.prototype.map.call(document.querySelectorAll('.sch-chk:checked'),function(c){return c.value;});
+  if(!picked.length){alert('กรุณาติ๊กเลือกอย่างน้อย 1 คน เพื่อพิมพ์ตารางปฏิบัติงาน');return;}
+  var pw=openPrintWindow();if(!pw)return;
+  var sched=buildTeamSchedule().filter(function(m){return picked.indexOf(m.t.psp_id)>-1;});
+  var TYPE_LBL={repair:'REPAIR',lbs:'LBS',ev:'EV CHARGER'};
+  var TYPE_COL={repair:'#2d7ff9',lbs:'#f5920b',ev:'#28a745'};
+  var printedOn=new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+  var sections=sched.map(function(m){
+    var rows=m.jobs.length?m.jobs.map(function(j){var st=jobProgressText(j.start,j.end);return '<tr>'
+      +'<td style="font-family:monospace;white-space:nowrap">'+esc(j.no)+'</td>'
+      +'<td><span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;color:#fff;background:'+(TYPE_COL[j.type]||'#666')+'">'+(TYPE_LBL[j.type]||j.type)+'</span></td>'
+      +'<td>'+esc(j.title||'—')+'</td>'
+      +'<td style="white-space:nowrap">'+fmtDate(j.start)+' → '+fmtDate(j.end)+'</td>'
+      +'<td style="font-weight:600;color:'+(st==='OVERDUE'?'#e53e3e':st==='IN PROGRESS'?'#2d7ff9':'#555')+'">'+st+'</td>'
+      +'</tr>';}).join('')
+      :'<tr><td colspan="5" style="text-align:center;color:#999;padding:12px">— ว่าง / Available —</td></tr>';
+    return '<div class="person">'
+      +'<div class="ph"><span class="pn">'+esc(m.t.name)+'</span><span class="pm">'+esc(m.t.position||'')+' · '+esc(m.t.psp_id)+' · '+m.jobs.length+' งาน</span></div>'
+      +'<table><thead><tr><th style="width:14%">Job No.</th><th style="width:13%">Type</th><th>Title</th><th style="width:22%">Schedule</th><th style="width:14%">Status</th></tr></thead><tbody>'+rows+'</tbody></table>'
+      +'</div>';
   }).join('');
-  return '<div style="display:flex;gap:10px;margin-bottom:14px"><button class="btn btn-pri" onclick="assignRepair()">🔧 Assign Repair</button><button class="btn btn-war" onclick="assignLBS()">⚡ Assign LBS</button><button class="btn btn-war" onclick="assignEV()">🔌 Assign EV</button><button class="btn btn-suc" onclick="openAddTeamMember()">+ Add Member</button></div>'
-    +'<div class="card" style="margin-bottom:16px"><div class="card-h"><h4>📋 Service &amp; Scheduling (รายบุคคล)</h4><span class="ch-sub">'+DB.team.length+' คน</span></div><div class="card-b">'+(schedHtml||'<div class="empty-state" style="padding:22px"><div class="es-sub">— ยังไม่มีทีมงาน —</div></div>')+'</div></div>'
-    +'<div class="card"><div class="card-h"><h4>👥 Team Members</h4></div><div class="card-b"><div class="team-strip">'+teamCards+'</div></div></div>';
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Service & Scheduling</title><style>'
+    +'*{box-sizing:border-box}body{font-family:"Segoe UI",Tahoma,sans-serif;color:#1a2744;margin:0;padding:24px}'
+    +'h1{font-size:19px;margin:0 0 2px}.sub{font-size:12px;color:#667;margin-bottom:16px}'
+    +'.person{margin-bottom:18px;page-break-inside:avoid}'
+    +'.ph{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1a2744;padding-bottom:4px;margin-bottom:6px}'
+    +'.pn{font-size:15px;font-weight:700}.pm{font-size:11px;color:#667}'
+    +'table{width:100%;border-collapse:collapse;font-size:12px}'
+    +'th{text-align:left;background:#f1f4f9;padding:6px 8px;font-size:10px;text-transform:uppercase;color:#556;border-bottom:1px solid #ccd}'
+    +'td{padding:6px 8px;border-bottom:1px solid #eef}'
+    +'@media print{@page{size:A4;margin:14mm 12mm}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    +'</style></head><body>'
+    +'<h1>📋 ตารางปฏิบัติงาน — Service &amp; Scheduling</h1>'
+    +'<div class="sub">PSP102 Service Maintenance &amp; Support · '+picked.length+' คน · พิมพ์เมื่อ '+esc(printedOn)+'</div>'
+    +sections+'</body></html>';
+  writePrintWindow(pw,html);
 }
 function assignRepair(){var pending=DB.serviceOrders.filter(function(s){return s.status==='PENDING'}),active=DB.team.filter(function(t){return t.active});if(!pending.length){alert('No pending Service Orders');return;}var body='<div class="fg"><label>Service Order</label><select id="ar_so">'+pending.map(function(s){return '<option value="'+s.id+'">'+esc(s.so_no)+' — '+esc(s.description)+'</option>'}).join('')+'</select></div><div class="fg"><label>Team Members</label>'+active.map(function(t){return '<label class="rst-chk"><input type="checkbox" value="'+t.psp_id+'" class="ar-chk"><span>'+esc(t.name)+'</span></label>'}).join('')+'</div>';openModal('Assign Repair Team',body,'<button class="btn btn-pri" onclick="doAssignRepair()">Assign</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button>');}
 function doAssignRepair(){var soId=document.getElementById('ar_so').value;var team=Array.from(document.querySelectorAll('.ar-chk:checked')).map(function(c){return c.value});if(!team.length){alert('Select at least one member');return;}showLoading('Assigning...');gsr('serverAssignTeam',soId,team,curUser).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo('team-management')}).catch(function(e){hideLoading();alert('Error: '+e)});}
