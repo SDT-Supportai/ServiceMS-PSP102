@@ -191,6 +191,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .attach-copy{padding:3px 9px;border:1px solid var(--border);background:var(--bg-w);border-radius:var(--r-sm);font-size:.68rem;cursor:pointer;color:var(--text-2);transition:.15s;white-space:nowrap}
 .attach-copy:hover{border-color:var(--blue);color:var(--blue)}
 .attach-copy.copied{background:var(--green-s);color:var(--green-a);border-color:var(--green-a)}
+/* ตัวเลือก มี/ไม่มี ปัญหา (popup ปิดงาน) */
+.iss-radios{display:flex;gap:10px;flex-wrap:wrap}
+.iss-opt{flex:1;min-width:150px;display:flex;align-items:center;gap:9px;padding:11px 14px;
+  border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-w);cursor:pointer;
+  font-size:.85rem;font-weight:600;color:var(--text-1);transition:.15s}
+.iss-opt:hover{border-color:var(--blue)}
+.iss-opt input{width:17px;height:17px;cursor:pointer;accent-color:var(--blue);flex:none}
+.iss-opt:has(input:checked){border-color:var(--blue);background:var(--blue-d);color:var(--blue)}
 .filter-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
 .filter-bar input,.filter-bar select{padding:7px 11px;background:var(--bg-w);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-0);font-family:var(--font);font-size:.8rem}
 .btn{padding:8px 18px;border-radius:var(--r-sm);font-family:var(--font);font-size:.82rem;font-weight:500;cursor:pointer;border:1px solid transparent;transition:.15s;display:inline-flex;align-items:center;gap:5px}
@@ -730,9 +738,23 @@ function getCheckin(prefix){
   return (isFinite(la)&&isFinite(ln)&&la>=-90&&la<=90&&ln>=-180&&ln<=180)?{lat:la,lng:ln}:null;
 }
 var _ciOnDone=null,_ciMap=null,_ciMarker=null;
+/* วาด/อัปเดตแผนที่พรีวิวพิกัด — ใช้ร่วมกันระหว่าง popup Check-in และ popup ปิดงาน */
+function ciDrawMap(c){
+  if(!c||!window.L)return;
+  var md=document.getElementById('ci_map');if(!md)return;
+  md.style.display='block';
+  try{
+    if(!_ciMap){
+      _ciMap=L.map(md).setView([c.lat,c.lng],15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_ciMap);
+      _ciMarker=L.marker([c.lat,c.lng]).addTo(_ciMap);
+      setTimeout(function(){try{_ciMap.invalidateSize();}catch(e){}},100);
+    }else{_ciMap.setView([c.lat,c.lng],15);_ciMarker.setLatLng([c.lat,c.lng]);}
+  }catch(e){}
+}
 function ciValidate(){
   var c=getCheckin('ci');var ok=document.getElementById('ci_ok');if(ok)ok.disabled=!c;
-  if(c&&window.L){var md=document.getElementById('ci_map');if(md){md.style.display='block';try{if(!_ciMap){_ciMap=L.map(md).setView([c.lat,c.lng],15);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_ciMap);_ciMarker=L.marker([c.lat,c.lng]).addTo(_ciMap);setTimeout(function(){try{_ciMap.invalidateSize();}catch(e){}},100);}else{_ciMap.setView([c.lat,c.lng],15);_ciMarker.setLatLng([c.lat,c.lng]);}}catch(e){}}}
+  ciDrawMap(c);
 }
 function openCheckin(kind,refNo,label,onDone){
   _ciOnDone=onDone;_ciMap=null;_ciMarker=null;
@@ -978,6 +1000,7 @@ function showHandoverDetail(id){
     +'</div>';
   body+='<div class="detail-section-title">&#128279; เอกสารแนบประกอบการพิจารณา</div>';
   body+='<div class="detail-attach"><div class="da-label">ไฟล์แนบ / Attachments</div>'+attachListHtml(h)+'</div>';
+  body+=issueBlockHtml(h);
   if(h.comments&&h.status==='RETURNED'){
     body+='<div class="detail-section-title">&#8617;&#65039; Return Comments</div>';
     body+='<div class="detail-return-comment"><div class="dc-label">เหตุผลการส่งกลับ</div><div class="dc-text">'+esc(h.comments)+'</div></div>';
@@ -1000,7 +1023,7 @@ function showHandoverDetail(id){
 
 function approveHandover(id){showLoading('Approving...');gsr('serverApprove','Handovers',id,curUser).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});}
 function returnHandover(id){openReturnModal('Handovers',id);}
-function completeHandover(id){if(!confirm('Mark as COMPLETED?'))return;showLoading('Completing...');gsr('serverCompleteHandover',id,curUser).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});}
+function completeHandover(id){openCompleteWork('HANDOVER',id);}
 function deleteRecord(sheet,id){if(curRole!=='manager'){alert('Manager access only');return;}if(!confirm('Delete this record? Cannot be undone.'))return;showLoading('Deleting...');closeModal();gsr('serverDelete',sheet,id).then(function(r){if(r&&r.success!==false){addLog('Deleted '+id);return loadAllData();}else throw new Error(r&&r.error||'Delete failed');}).then(function(){hideLoading();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});}
 
 /* ═══════════════════════════════════════════════════════
@@ -1117,7 +1140,7 @@ function renderHandoverList(){
   if(tab==='repair')return bar+renderServiceOrders();
   if(tab==='reports')return bar+renderServiceReports();
   var hos=DB.handovers.filter(function(h){return !['SUBMITTED','RESUBMITTED'].includes(h.status)});
-  function hoRow(h){return '<tr data-status="'+h.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showHandoverDetail(\''+h.id+'\')">'+esc(h.job_no)+'</td><td>'+esc(h.project_name)+'</td><td style="font-size:.78rem">'+esc(h.customer_name||'—')+'</td><td style="font-size:.75rem"><div>'+esc(h.customer_contact||'—')+'</div><div style="color:var(--text-3)">'+esc(h.phone||'')+'</div></td><td style="font-size:.72rem">'+(h.warranty_type||'—')+'<br><span style="color:var(--text-3)">'+fmtDate(h.warranty_start)+' → '+fmtDate(h.warranty_end)+'</span></td><td style="font-family:var(--mono)">'+fmtTHBShort(h.warranty_budget)+'</td><td><span class="sts '+stsCls(h.status)+'">'+h.status+'</span></td>'
+  function hoRow(h){return '<tr data-status="'+h.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showHandoverDetail(\''+h.id+'\')">'+esc(h.job_no)+'</td><td>'+esc(h.project_name)+'</td><td style="font-size:.78rem">'+esc(h.customer_name||'—')+'</td><td style="font-size:.75rem"><div>'+esc(h.customer_contact||'—')+'</div><div style="color:var(--text-3)">'+esc(h.phone||'')+'</div></td><td style="font-size:.72rem">'+(h.warranty_type||'—')+'<br><span style="color:var(--text-3)">'+fmtDate(h.warranty_start)+' → '+fmtDate(h.warranty_end)+'</span></td><td style="font-family:var(--mono)">'+fmtTHBShort(h.warranty_budget)+'</td><td><span class="sts '+stsCls(h.status)+'">'+h.status+'</span>'+issueBadge(h)+'</td>'
       +'<td style="white-space:nowrap"><button class="btn btn-sec btn-sm" onclick="showHandoverDetail(\''+h.id+'\')">&#128065; View</button> '
       +(['SUBMITTED','RESUBMITTED'].includes(h.status)?'<button class="btn btn-suc btn-sm" onclick="approveHandover(\''+h.id+'\')">✓</button><button class="btn btn-dan btn-sm" onclick="returnHandover(\''+h.id+'\')">↩</button>':'')
       +(h.status==='APPROVED'?'<button class="btn btn-complete btn-sm" onclick="completeHandover(\''+h.id+'\')">✔Done</button> <button class="btn btn-war btn-sm" onclick="openBudgetUpdate(\''+h.id+'\')">💰</button> <button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Handover\',\''+h.id+'\')">📄</button>':'')
@@ -1328,6 +1351,7 @@ function showLBSDetail(id){
   }
   body+='<div class="detail-section-title">&#128279; เอกสารแนบประกอบการพิจารณา</div>';
   body+='<div class="detail-attach"><div class="da-label">ไฟล์แนบ / Attachments</div>'+attachListHtml(l)+'</div>';
+  body+=issueBlockHtml(l);
   if(l.comments&&l.status==='RETURNED'){
     body+='<div class="detail-section-title">&#8617;&#65039; Return Comments</div>';
     body+='<div class="detail-return-comment"><div class="dc-label">เหตุผลการส่งกลับ</div><div class="dc-text">'+esc(l.comments)+'</div></div>';
@@ -1358,7 +1382,92 @@ function siteOfCheckin(c){
   return c.ref_no;
 }
 function existingSiteCheckin(siteKey){if(!siteKey)return null;return (DB.checkins||[]).find(function(c){return typeof c.lat==='number'&&typeof c.lng==='number'&&c.lat>=-90&&c.lat<=90&&c.lng>=-180&&c.lng<=180&&siteOfCheckin(c)===siteKey;})||null;}
-function completeLBS(id){var l=DB.lbsWorks.find(function(x){return x.id===id});var site=l?l.job_no:'';var ex=existingSiteCheckin(site);if(ex){if(!confirm('Job '+site+' มี Check-in Location อยู่แล้ว ('+ex.lat.toFixed(4)+', '+ex.lng.toFixed(4)+') — ใช้ตำแหน่งเดิม ไม่ check-in ใหม่ ✓ ตกลงปิดงาน?'))return;showLoading('Completing...');gsr('serverCompleteLBS',id,curUser).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});return;}openCheckin('LBS',(l?l.job_no:id),(l?l.project_name:''),function(ci){showLoading('Completing...');var p=ci?gsr('serverAddCheckin','LBS',(l?l.job_no:id),ci.lat,ci.lng,'',(l?l.project_name:''),'COMPLETED',curUser):Promise.resolve();p.then(function(){return gsr('serverCompleteLBS',id,curUser)}).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});});}
+/* ═══════════════════════════════════════════════════════
+   COMPLETE WORK POPUP — รายงานปัญหาก่อนปิดงาน (+ Check-in สำหรับ LBS/EV)
+   ใช้ร่วมกัน 3 เมนู: Project Handover · LBS Project · EV Charger Project
+   รวมเป็น popup เดียว (ไม่เด้งซ้อน 2 ชั้น) → ปุ่มยืนยันเดียว
+═══════════════════════════════════════════════════════ */
+var _cwCtx=null;
+function issueFormHtml(){
+  return '<div class="form-section-title">⚠️ งานนี้มีปัญหาหรือไม่ <span style="color:var(--red)">*</span></div>'
+    +'<div class="iss-radios">'
+      +'<label class="iss-opt"><input type="radio" name="iss_flag" value="NONE" checked onchange="issToggle()"><span>✅ ไม่มีปัญหา</span></label>'
+      +'<label class="iss-opt"><input type="radio" name="iss_flag" value="HAS" onchange="issToggle()"><span>⚠️ มีปัญหา</span></label>'
+    +'</div>'
+    +'<div id="iss_box" style="display:none;margin-top:12px">'
+      +'<div class="fg"><label>รายละเอียดปัญหา <span style="color:var(--red)">*</span></label>'
+      +'<textarea id="iss_detail" style="min-height:80px" placeholder="อธิบายปัญหาที่พบระหว่างดำเนินงาน เช่น อุปกรณ์ชำรุด เข้าหน้างานไม่ได้ ลูกค้าเลื่อนนัด..."></textarea></div>'
+      +'<div class="fg"><label>ไฟล์ / รูปประกอบ (ถ้ามี)</label>'
+      +'<button type="button" class="btn-attach" onclick="document.getElementById(\'iss_files\').click()">📎 เลือกไฟล์...</button>'
+      +'<input type="file" id="iss_files" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none" onchange="handleFileAttach(this,\'iss_filelist\')">'
+      +'<div class="file-attach-zone" id="iss_filelist"></div></div>'
+    +'</div>';
+}
+function issToggle(){
+  var el=document.querySelector('input[name="iss_flag"]:checked');
+  var box=document.getElementById('iss_box');
+  if(box)box.style.display=(el&&el.value==='HAS')?'block':'none';
+}
+function cwValidate(){
+  var c=getCheckin('ci');var ok=document.getElementById('cw_ok');
+  if(ok&&_cwCtx&&_cwCtx.needCI)ok.disabled=!c;
+  ciDrawMap(c);
+}
+function openCompleteWork(kind,id){
+  var rec=(kind==='HANDOVER'?DB.handovers:DB.lbsWorks).find(function(x){return x.id===id});
+  if(!rec)return;
+  attachedFiles=[];_ciMap=null;_ciMarker=null;
+  var needCI=false,ex=null;
+  if(kind!=='HANDOVER'){ex=existingSiteCheckin(rec.job_no);needCI=!ex;}
+  _cwCtx={kind:kind,id:id,rec:rec,needCI:needCI};
+  var head='<div style="background:var(--bg-surface);border:1px solid var(--border-s);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px;font-size:.8rem;line-height:1.6">'
+    +'<b style="font-family:var(--mono)">'+esc(rec.job_no||'')+'</b> · '+esc(rec.project_name||'—')
+    +'<br><span style="color:var(--text-3);font-size:.74rem">บันทึกผลการดำเนินงานก่อนปิดงาน — ข้อมูลจะแสดงในรายละเอียดงานและแจ้งทีมงาน</span></div>';
+  var ciPart='';
+  if(needCI){
+    ciPart=checkinFieldHtml('ci','cwValidate()')
+      +'<div id="ci_map" style="height:190px;border-radius:8px;overflow:hidden;margin-top:8px;display:none;border:1px solid var(--border-s)"></div>';
+  }else if(ex){
+    ciPart='<div class="form-section-title">📍 Check-in Location</div>'
+      +'<div style="background:var(--green-s);border-radius:var(--r-sm);padding:9px 12px;font-size:.78rem;color:var(--green-a)">✅ ใช้พิกัดเดิมของไซต์นี้ ('+ex.lat.toFixed(4)+', '+ex.lng.toFixed(4)+') — ไม่ต้อง check-in ซ้ำ</div>';
+  }
+  openModal('✔ ปิดงาน — '+esc(rec.job_no||''),head+issueFormHtml()+ciPart,
+    '<button class="btn btn-suc" id="cw_ok"'+(needCI?' disabled':'')+' onclick="submitCompleteWork()">✅ ยืนยันปิดงาน</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
+  if(needCI)setTimeout(function(){gpsInto('ci');},120);
+}
+function submitCompleteWork(){
+  var ctx=_cwCtx;if(!ctx)return;
+  var fl=document.querySelector('input[name="iss_flag"]:checked');
+  var flag=fl?fl.value:'NONE';
+  var det=(document.getElementById('iss_detail')||{}).value||'';
+  if(flag==='HAS'&&det.trim().length<5){alert('กรุณาระบุรายละเอียดปัญหา (อย่างน้อย 5 ตัวอักษร)');return;}
+  var ci=null;
+  if(ctx.needCI){ci=getCheckin('ci');if(!ci){alert('กรุณาระบุพิกัด Check-in (กด GPS หรือกรอกเอง)');return;}}
+  var issue={flag:flag,detail:flag==='HAS'?det.trim():'',
+    files:flag==='HAS'?(attachedFiles||[]).filter(Boolean).map(function(f){return {name:f.name,b64:f.b64,mime:f.mime};}):[]};
+  showLoading('Completing...');
+  var chain=Promise.resolve();
+  if(ci)chain=chain.then(function(){return gsr('serverAddCheckin','LBS',ctx.rec.job_no,ci.lat,ci.lng,'',ctx.rec.project_name||'','COMPLETED',curUser);});
+  chain.then(function(){return gsr(ctx.kind==='HANDOVER'?'serverCompleteHandover':'serverCompleteLBS',ctx.id,curUser,issue);})
+    .then(function(){return loadAllData()})
+    .then(function(){hideLoading();closeModal();_cwCtx=null;attachedFiles=[];navigateTo(curPage);
+      alert(flag==='HAS'?'✅ ปิดงานเรียบร้อย — บันทึกรายงานปัญหาแล้ว':'✅ ปิดงานเรียบร้อย');})
+    .catch(function(e){hideLoading();alert('Error: '+e)});
+}
+/* บล็อกแสดงรายงานปัญหาในหน้า detail + ไอคอนเตือนในตาราง */
+function issueBlockHtml(rec){
+  if(!rec||!rec.issue_flag)return '';
+  var h='<div class="detail-section-title">⚠️ รายงานผลการดำเนินงาน</div>';
+  if(rec.issue_flag==='HAS'){
+    h+='<div class="detail-return-comment"><div class="dc-label">ปัญหาที่พบ</div><div class="dc-text">'+esc(rec.issue_detail||'—').replace(/\n/g,'<br>')+'</div></div>';
+    if(rec.issue_files)h+='<div class="detail-attach" style="margin-top:10px"><div class="da-label">ไฟล์ประกอบปัญหา</div>'+attachListHtml({attachment_files:rec.issue_files})+'</div>';
+  }else{
+    h+='<div class="detail-comment"><div class="dc-label">สถานะ</div><div class="dc-text">✅ ไม่พบปัญหาระหว่างดำเนินงาน</div></div>';
+  }
+  return h;
+}
+function issueBadge(rec){return (rec&&rec.issue_flag==='HAS')?' <span title="พบปัญหาตอนปิดงาน" style="color:var(--red)">⚠️</span>':'';}
+function completeLBS(id){openCompleteWork('LBS',id);}
 function completeSO(id){var so=DB.serviceOrders.find(function(x){return x.id===id});var site=so?so.ref_job_no:'';var proj=so?(projFromJob(so.ref_job_no)||so.description||''):'';var ex=existingSiteCheckin(site);if(ex){if(!confirm('ไซต์ Job '+site+' มี Check-in Location อยู่แล้ว ('+ex.lat.toFixed(4)+', '+ex.lng.toFixed(4)+') — ล็อกตำแหน่งเดิม ไม่ check-in ใหม่ ✓ ตกลงปิดงาน?'))return;showLoading('Completing...');gsr('serverCompleteSO',id,curUser).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});return;}openCheckin('SO',(so?so.so_no:id),proj,function(ci){showLoading('Completing...');var p=ci?gsr('serverAddCheckin','SO',(so?so.so_no:id),ci.lat,ci.lng,'',proj,'DONE',curUser):Promise.resolve();p.then(function(){return gsr('serverCompleteSO',id,curUser)}).then(function(){return loadAllData()}).then(function(){hideLoading();closeModal();navigateTo(curPage)}).catch(function(e){hideLoading();alert('Error: '+e)});});}
 function toggleCollapse(bodyId,hdrEl){var body=document.getElementById(bodyId);if(!body)return;body.classList.toggle('open');hdrEl.classList.toggle('open');}
 
@@ -1373,7 +1482,7 @@ function renderLBSList(){
   var statusOrder={APPROVED:0,ASSIGNED:1,SUBMITTED:2,RESUBMITTED:3,RETURNED:4};
   active.sort(function(a,b){var oa=statusOrder[a.status]!=null?statusOrder[a.status]:9,ob=statusOrder[b.status]!=null?statusOrder[b.status]:9;if(oa!==ob)return oa-ob;return(parseISO(a.planned_start)||'').localeCompare(parseISO(b.planned_start)||'');});
   function lbsRow(l){var teamNames=Array.isArray(l.assigned_team)?l.assigned_team.filter(Boolean).map(function(t){return getTeamName(t)}).join(', '):'';
-    return '<tr data-status="'+l.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showLBSDetail(\''+l.id+'\')">'+esc(l.job_no)+'</td><td>'+esc(l.project_name)+'</td><td style="font-size:.72rem">'+(l.work_type||'').replace(/_/g,' ')+'</td><td style="font-size:.72rem;color:var(--text-2)">'+fmtDate(l.planned_start)+'<br>→ '+fmtDate(l.planned_end)+'</td><td style="font-size:.75rem">'+(teamNames||'<span style="color:var(--text-3)">—</span>')+'</td><td><span class="sts '+stsCls(l.status)+'">'+l.status+'</span></td>'
+    return '<tr data-status="'+l.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showLBSDetail(\''+l.id+'\')">'+esc(l.job_no)+'</td><td>'+esc(l.project_name)+'</td><td style="font-size:.72rem">'+(l.work_type||'').replace(/_/g,' ')+'</td><td style="font-size:.72rem;color:var(--text-2)">'+fmtDate(l.planned_start)+'<br>→ '+fmtDate(l.planned_end)+'</td><td style="font-size:.75rem">'+(teamNames||'<span style="color:var(--text-3)">—</span>')+'</td><td><span class="sts '+stsCls(l.status)+'">'+l.status+'</span>'+issueBadge(l)+'</td>'
       +'<td style="white-space:nowrap"><button class="btn btn-sec btn-sm" onclick="showLBSDetail(\''+l.id+'\')">&#128065; View</button> '
       +(['SUBMITTED','RESUBMITTED'].includes(l.status)?'<button class="btn btn-suc btn-sm" onclick="approveLBS(\''+l.id+'\')">✓</button><button class="btn btn-dan btn-sm" onclick="returnLBS(\''+l.id+'\')">↩</button>':'')
       +(l.status==='ASSIGNED'?'<button class="btn btn-complete btn-sm" onclick="completeLBS(\''+l.id+'\')">✔Done</button> ':'')
