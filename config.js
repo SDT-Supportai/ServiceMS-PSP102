@@ -10,7 +10,7 @@ window.SERVICEMS_CONFIG = {
   SUPABASE_URL: 'https://yqmvlsdzppygsrtrctjz.supabase.co',
 
   // Supabase → Project Settings → API → Project API keys → anon / public
-  SUPABASE_ANON_KEY: 'PASTE_YOUR_ANON_KEY_HERE',
+  SUPABASE_ANON_KEY: 'sb_publishable_qU1B87CYzQ9bDrj-h0BvOw_ekE-8xl-',
 
   // แสดงมุมล่างของ Sidebar — ใช้ยืนยันว่าผู้ใช้เปิดเวอร์ชันล่าสุดจริง
   APP_VERSION: '2026.08.07'
