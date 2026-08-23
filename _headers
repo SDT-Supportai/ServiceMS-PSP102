@@ -1,0 +1,19 @@
+# ServiceMS — cache policy
+# รองรับทั้ง Netlify และ Cloudflare Pages (ไฟล์ชื่อ _headers วางที่ root)
+# เหตุผล: index.html/config.js คือทั้งแอป ถ้าเบราว์เซอร์ cache ไว้
+# ผู้ใช้จะไม่เห็นฟีเจอร์ใหม่หลัง deploy จนกว่าจะกด Ctrl+F5 เอง
+
+/
+  Cache-Control: no-cache, must-revalidate
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/index.html
+  Cache-Control: no-cache, must-revalidate
+  X-Content-Type-Options: nosniff
+
+/config.js
+  Cache-Control: no-cache, must-revalidate
+
+/manual-project-role.html
+  Cache-Control: no-cache, must-revalidate

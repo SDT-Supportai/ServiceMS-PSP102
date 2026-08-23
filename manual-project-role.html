@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ServiceMS · คู่มือการใช้งาน — Project Role</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bp1:#0a1a33; --line:rgba(120,170,235,.18); --line-2:rgba(120,170,235,.32);
+  --txt:#e8f0fb; --txt-2:#a6bcdb; --txt-3:#728aae;
+  --blue:#38bdf8; --navy:#3b82f6; --green:#34d399; --amber:#fbbf24; --orange:#fb923c; --teal:#2dd4bf; --violet:#a78bfa; --red:#fb7185;
+  --r:14px; --mono:'IBM Plex Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans Thai',sans-serif;color:var(--txt);line-height:1.55;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(1200px 600px at 85% -10%,rgba(56,189,248,.10),transparent 60%),radial-gradient(900px 500px at 0% 100%,rgba(52,211,153,.07),transparent 55%),linear-gradient(180deg,var(--bp1),#08152b 60%,#070f1f);
+  background-attachment:fixed;min-height:100vh;}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(circle at 50% 25%,#000 60%,transparent 100%);opacity:.5}
+.wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:40px 20px 70px}
+
+/* header */
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;border-bottom:2px solid var(--line-2);padding-bottom:20px}
+.brand{display:flex;align-items:center;gap:13px}
+.logo{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#38bdf8,#1a4d8f);display:flex;align-items:center;justify-content:center;font-family:'Bai Jamjuree';font-weight:700;font-size:24px;color:#fff;box-shadow:0 8px 24px rgba(56,189,248,.35),inset 0 1px 0 rgba(255,255,255,.4)}
+.brand h1{font-family:'Bai Jamjuree';font-weight:700;font-size:21px;color:#fff;letter-spacing:.4px}
+.brand .sub{font-size:11.5px;color:var(--txt-2);font-family:var(--mono);letter-spacing:1px}
+.tag{text-align:right}
+.tag .doc{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--blue);text-transform:uppercase}
+.tag .big{font-family:'Bai Jamjuree';font-weight:700;font-size:18px;color:#fff;margin-top:3px}
+.tag .role{display:inline-block;margin-top:6px;font-family:var(--mono);font-size:11px;background:rgba(56,189,248,.14);border:1px solid var(--line-2);color:var(--blue);padding:3px 11px;border-radius:20px}
+
+/* section heading */
+.sec{margin-top:38px}
+.sec-h{display:flex;align-items:center;gap:11px;margin-bottom:16px}
+.sec-h .ic{font-size:16px}
+.sec-h h2{font-family:'Bai Jamjuree';font-weight:600;font-size:17px}
+.sec-h .rule{flex:1;height:1px;background:var(--line)}
+
+/* can / cannot */
+.cc{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:640px){.cc{grid-template-columns:1fr}}
+.cc .box{border:1px solid var(--line-2);border-radius:var(--r);padding:15px 16px;background:linear-gradient(180deg,rgba(20,40,72,.6),rgba(12,26,48,.5))}
+.cc .box.ok{border-left:4px solid var(--green)}
+.cc .box.no{border-left:4px solid var(--red)}
+.cc .box h3{font-size:13px;font-family:'Bai Jamjuree';margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.cc .box.ok h3{color:var(--green)} .cc .box.no h3{color:var(--red)}
+.cc ul{list-style:none;display:flex;flex-direction:column;gap:6px}
+.cc li{font-size:12.5px;color:var(--txt-2);padding-left:18px;position:relative}
+.cc li::before{position:absolute;left:0;top:0}
+.cc .ok li::before{content:"✓";color:var(--green);font-weight:700}
+.cc .no li::before{content:"✕";color:var(--red);font-weight:700}
+
+/* menu strip */
+.menu{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+@media(max-width:640px){.menu{grid-template-columns:repeat(2,1fr)}}
+.mi{border:1px solid var(--line-2);border-radius:var(--r);padding:14px 12px;text-align:center;background:linear-gradient(180deg,rgba(20,40,72,.55),rgba(12,26,48,.45))}
+.mi .e{font-size:22px}
+.mi .n{font-family:'Bai Jamjuree';font-weight:600;font-size:13px;margin-top:6px}
+.mi .d{font-size:10.5px;color:var(--txt-3);margin-top:3px}
+
+/* steps timeline */
+.steps{position:relative;margin-top:6px}
+.steps::before{content:"";position:absolute;left:19px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--blue),var(--teal));opacity:.45}
+.step{position:relative;padding-left:54px;margin-bottom:18px}
+.step .num{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--blue),#1a4d8f);color:#fff;font-family:'Bai Jamjuree';font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(56,189,248,.35);z-index:1}
+.card{border:1px solid var(--line-2);border-radius:var(--r);padding:15px 17px;background:linear-gradient(180deg,rgba(20,40,72,.6),rgba(12,26,48,.5))}
+.card .st{font-family:'Bai Jamjuree';font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card .st .en{font-family:var(--mono);font-size:10px;color:var(--txt-3);letter-spacing:1px}
+.card p{font-size:12.8px;color:var(--txt-2);margin-top:7px}
+.card .hint{margin-top:9px;font-size:11.8px;color:var(--txt-2);background:rgba(56,189,248,.07);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;padding:8px 11px}
+.card .hint.amber{border-color:var(--amber);background:rgba(251,191,36,.08)}
+.card .hint.green{border-color:var(--green);background:rgba(52,211,153,.08)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font-size:11px;font-family:var(--mono);border:1px solid var(--line-2);border-radius:7px;padding:4px 9px;color:var(--txt);background:rgba(11,24,45,.5)}
+.chip.grp{border-color:rgba(56,189,248,.4);color:var(--blue)}
+.btnchip{font-size:11.5px;font-weight:600;border-radius:8px;padding:5px 12px;color:#08152b;background:linear-gradient(135deg,var(--blue),#60c8fb);display:inline-block}
+
+/* status legend */
+.stg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sl{border:1px solid var(--line-2);border-radius:11px;padding:11px 13px;background:rgba(11,24,45,.5)}
+.sl .b{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 9px;border-radius:20px;letter-spacing:.5px}
+.sl .t{font-size:11.8px;color:var(--txt-2);margin-top:7px}
+.b-sub{background:rgba(251,191,36,.16);color:var(--amber)} .b-app{background:rgba(56,189,248,.16);color:var(--blue)}
+.b-ret{background:rgba(251,113,133,.16);color:var(--red)} .b-re{background:rgba(167,139,250,.16);color:var(--violet)} .b-done{background:rgba(52,211,153,.16);color:var(--green)}
+
+/* handoff flow */
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:9px;justify-content:center;padding:4px 0}
+.fb{border:1.5px solid var(--line-2);border-radius:12px;padding:11px 15px;text-align:center;min-width:120px;background:rgba(11,24,45,.5)}
+.fb .who{font-family:'Bai Jamjuree';font-weight:700;font-size:13px}
+.fb .ac{font-size:10.5px;color:var(--txt-3);margin-top:2px;font-family:var(--mono)}
+.fb.me{border-color:var(--blue);box-shadow:0 6px 18px rgba(56,189,248,.2)}
+.ar{color:var(--blue);font-size:20px}
+
+/* tips */
+.tips{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+@media(max-width:640px){.tips{grid-template-columns:1fr}}
+.tip{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line-2);border-radius:11px;padding:11px 13px;background:rgba(11,24,45,.45);font-size:12.3px;color:var(--txt-2)}
+.tip .e{font-size:17px;flex:0 0 auto}
+.tip b{color:#fff;font-weight:600}
+
+.foot{margin-top:32px;text-align:center;font-size:10px;color:var(--txt-3);font-family:var(--mono);letter-spacing:.5px;border-top:1px solid var(--line);padding-top:14px}
+
+.sec,.head{opacity:0;transform:translateY(12px);animation:rise .6s cubic-bezier(.2,.8,.2,1) forwards}
+.head{animation-delay:0s}.sec:nth-of-type(1){animation-delay:.1s}.sec:nth-of-type(2){animation-delay:.16s}.sec:nth-of-type(3){animation-delay:.22s}.sec:nth-of-type(4){animation-delay:.28s}.sec:nth-of-type(5){animation-delay:.34s}.sec:nth-of-type(6){animation-delay:.4s}
+@keyframes rise{to{opacity:1;transform:none}}
+@media print{@page{size:A4;margin:11mm}body{background:#0a1a33!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}body::before{position:absolute}.sec,.head{opacity:1!important;transform:none!important;animation:none!important}.step,.card,.cc,.menu{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="brand"><div class="logo">S</div><div><h1>ServiceMS</h1><div class="sub">PSP102 · Precise System &amp; Project</div></div></div>
+    <div class="tag"><div class="doc">User Manual</div><div class="big">คู่มือการใช้งาน</div><div class="role">👤 สำหรับ Project Role</div></div>
+  </div>
+
+  <!-- WHAT YOU DO -->
+  <div class="sec">
+    <div class="sec-h"><span class="ic">🎯</span><h2>หน้าที่ของคุณในระบบ</h2><div class="rule"></div></div>
+    <div class="cc">
+      <div class="box ok"><h3>✅ สิ่งที่ทำได้</h3><ul>
+        <li>สร้าง <b>ใบส่งมอบโครงการ</b> (Project Handover)</li>
+        <li>สร้าง <b>งาน LBS &amp; Support</b></li>
+        <li><b>ติดตามสถานะ</b> รายการที่ส่งใน My Submissions</li>
+        <li>ดู <b>Dashboard</b> ภาพรวมและปฏิทิน</li>
+        <li>รับ <b>การแจ้งเตือน</b> เมื่อสถานะเปลี่ยน</li>
+      </ul></div>
+      <div class="box no"><h3>✕ สิ่งที่ไม่ใช่หน้าที่</h3><ul>
+        <li>อนุมัติ / ตีกลับเอกสาร — เป็นของ <b>Section</b></li>
+        <li>เปิดใบซ่อม (Service Order) / รายงานซ่อม</li>
+        <li>จัดทีม &amp; ตารางงาน</li>
+        <li>ตั้งค่าระบบ (System Settings)</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <!-- MENU -->
+  <div class="sec">
+    <div class="sec-h"><span class="ic">🧭</span><h2>เมนูของคุณ (4 รายการ)</h2><div class="rule"></div></div>
+    <div class="menu">
+      <div class="mi"><div class="e">📊</div><div class="n">Dashboard</div><div class="d">ภาพรวม + ปฏิทิน</div></div>
+      <div class="mi"><div class="e">📋</div><div class="n">Create Handover</div><div class="d">สร้างใบส่งมอบ</div></div>
+      <div class="mi"><div class="e">⚡</div><div class="n">Create LBS Work</div><div class="d">สร้างงาน LBS</div></div>
+      <div class="mi"><div class="e">📄</div><div class="n">My Submissions</div><div class="d">ติดตามสถานะ</div></div>
+    </div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="sec">
+    <div class="sec-h"><span class="ic">🪜</span><h2>ขั้นตอนการใช้งาน</h2><div class="rule"></div></div>
+    <div class="steps">
+
+      <div class="step"><div class="num">1</div><div class="card">
+        <div class="st">เข้าสู่ระบบ <span class="en">LOGIN</span></div>
+        <p>กรอก Username / Password ที่ได้รับ มุมขวาบนจะขึ้นป้าย <b>“Project Portal”</b> ยืนยันว่าเข้าถูกบทบาท</p>
+        <div class="chips"><span class="chip">บัญชีเริ่มต้น: project</span><span class="chip">รหัส: project102</span></div>
+        <div class="hint amber">เปลี่ยนรหัสเริ่มต้นทันทีหลังใช้งานครั้งแรก (แจ้งผู้ดูแล/Manager ตั้งให้)</div>
+      </div></div>
+
+      <div class="step"><div class="num">2</div><div class="card">
+        <div class="st">ดู Dashboard <span class="en">OVERVIEW</span></div>
+        <p>ดูจำนวนงาน สถานะ ปฏิทินทีม และนัดหมายที่ใกล้ถึง — หน้านี้เป็นแบบ <b>อ่านอย่างเดียว</b> ไว้ดูภาพรวมก่อนเริ่มงาน</p>
+      </div></div>
+
+      <div class="step"><div class="num">3</div><div class="card">
+        <div class="st">สร้างใบส่งมอบโครงการ <span class="en">CREATE HANDOVER</span></div>
+        <p>กรอกข้อมูลให้ครบ แล้วกดส่ง ระบบจะตั้งสถานะเป็น <b>SUBMITTED</b> รออนุมัติ</p>
+        <div class="chips">
+          <span class="chip grp">โครงการ:</span><span class="chip">Job No.</span><span class="chip">Project Name</span><span class="chip">Location</span><span class="chip">Project Manager</span><span class="chip">Handover Date</span>
+        </div>
+        <div class="chips">
+          <span class="chip grp">ลูกค้า:</span><span class="chip">Customer</span><span class="chip">ผู้ติดต่อ</span><span class="chip">Phone</span><span class="chip">Email</span>
+        </div>
+        <div class="chips">
+          <span class="chip grp">ประกัน/งบ:</span><span class="chip">Warranty Type</span><span class="chip">Start–End</span><span class="chip">Budget ฿</span><span class="chip">🔗 ลิงก์เอกสาร</span>
+        </div>
+        <div class="chips"><span class="btnchip">＋ Submit Handover</span></div>
+        <div class="hint">แนบเอกสารด้วย <b>ลิงก์ Google Drive</b> ในช่อง “ลิ้งค์ข้อมูลโครงการ” เพื่อให้ผู้อนุมัติเปิดดูได้</div>
+      </div></div>
+
+      <div class="step"><div class="num">4</div><div class="card">
+        <div class="st">สร้างงาน LBS &amp; Support <span class="en">CREATE LBS WORK</span></div>
+        <p>วิธีเดียวกับใบส่งมอบ ระบุ ชื่องาน, สถานที่, ลูกค้า, ประเภทงาน และขอบเขตงาน (Scope) แล้วกดส่ง → <b>SUBMITTED</b></p>
+        <div class="chips"><span class="chip">Work Name</span><span class="chip">Work Type</span><span class="chip">Scope of work</span><span class="chip">ลูกค้า/ติดต่อ</span><span class="chip">🔗 ลิงก์เอกสาร</span><span class="btnchip">＋ Submit</span></div>
+      </div></div>
+
+      <div class="step"><div class="num">5</div><div class="card">
+        <div class="st">ติดตามสถานะใน My Submissions <span class="en">TRACK</span></div>
+        <p>ตารางรวมทุกรายการที่คุณส่ง พร้อมคอลัมน์ <b>Status</b> และ <b>Comments</b></p>
+        <div class="hint amber">ถ้าโดน <b>RETURNED</b> ให้อ่านเหตุผลในช่อง Comments แล้วแก้ไขข้อมูล → ส่งรายการใหม่ให้ถูกต้อง</div>
+        <div class="hint green">ถ้าเป็น <b>APPROVED</b> แปลว่าผ่านแล้ว ทีมงานจะดำเนินการในขั้นถัดไปเอง</div>
+      </div></div>
+
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="sec">
+    <div class="sec-h"><span class="ic">🏷️</span><h2>ความหมายของสถานะ</h2><div class="rule"></div></div>
+    <div class="stg">
+      <div class="sl"><span class="b b-sub">SUBMITTED</span><div class="t">ส่งแล้ว กำลังรอ Section/Manager อนุมัติ</div></div>
+      <div class="sl"><span class="b b-app">APPROVED</span><div class="t">อนุมัติแล้ว เข้าสู่ขั้นตอนถัดไป</div></div>
+      <div class="sl"><span class="b b-ret">RETURNED</span><div class="t">ตีกลับให้แก้ไข — อ่านเหตุผลใน Comments</div></div>
+      <div class="sl"><span class="b b-re">RESUBMITTED</span><div class="t">ส่งกลับเข้าไปใหม่หลังแก้ไข</div></div>
+      <div class="sl"><span class="b b-done">COMPLETED</span><div class="t">ปิดงาน/สิ้นสุดการรับประกันแล้ว</div></div>
+    </div>
+  </div>
+
+  <!-- HANDOFF -->
+  <div class="sec">
+    <div class="sec-h"><span class="ic">🔄</span><h2>หลังจากคุณส่งแล้ว เกิดอะไรต่อ</h2><div class="rule"></div></div>
+    <div class="flow">
+      <div class="fb me"><div class="who">คุณ (Project)</div><div class="ac">สร้าง + ส่ง</div></div>
+      <span class="ar">→</span>
+      <div class="fb"><div class="who">Section</div><div class="ac">อนุมัติ / ตีกลับ</div></div>
+      <span class="ar">→</span>
+      <div class="fb"><div class="who">Manager &amp; ทีม</div><div class="ac">จัดทีม / ซ่อม / ปิดงาน</div></div>
+    </div>
+    <div class="card" style="margin-top:12px"><p style="margin:0">หน้าที่ของคุณ <b>จบที่การส่งและติดตามสถานะ</b> — ส่วนการอนุมัติ เปิดใบซ่อม และจัดทีม เป็นของบทบาทอื่น คุณเพียงรอผลแล้วแก้ไขถ้าถูกตีกลับ</p></div>
+  </div>
+
+  <!-- TIPS -->
+  <div class="sec">
+    <div class="sec-h"><span class="ic">💡</span><h2>เคล็ดลับ &amp; ข้อควรรู้</h2><div class="rule"></div></div>
+    <div class="tips">
+      <div class="tip"><span class="e">🔔</span><div>กด <b>กระดิ่ง</b> มุมบนเพื่อดูการแจ้งเตือน — ระบบยังส่งผ่าน <b>LINE/Email</b> เมื่อสถานะเปลี่ยน</div></div>
+      <div class="tip"><span class="e">📅</span><div>วันที่ทุกจุดแสดงเป็น <b>dd/mm/yyyy</b> · เลือกจากปฏิทินในช่องวันที่ได้เลย</div></div>
+      <div class="tip"><span class="e">🔗</span><div>แนบเอกสารประกอบเป็น <b>ลิงก์ Google Drive</b> ในช่องลิงก์ของแบบฟอร์ม</div></div>
+      <div class="tip"><span class="e">📱</span><div>ใช้งานบน <b>มือถือ</b> ได้เต็มรูปแบบ — เมนูอยู่ปุ่ม ☰ มุมซ้ายบน</div></div>
+      <div class="tip"><span class="e">🔄</span><div>กด <b>Refresh</b> เพื่อดึงสถานะล่าสุด ถ้าเพิ่งมีการอนุมัติ</div></div>
+      <div class="tip"><span class="e">🚪</span><div>เลิกใช้งานทุกครั้งให้กด <b>ออกจากระบบ</b> (เซสชันหมดอายุอัตโนมัติใน 8 ชม.)</div></div>
+    </div>
+  </div>
+
+  <div class="foot">ServiceMS · PSP102 — User Manual for Project Role · Precise System and Project Co., Ltd.</div>
+</div>
+</body>
+</html>
