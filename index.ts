@@ -279,7 +279,7 @@ async function fetchLineContent(token: string, messageId: string): Promise<{ byt
 async function uploadBytes(prefix: string, name: string, bytes: Uint8Array, mime: string): Promise<string> {
   const safe = (name || "file").replace(/[^\w.\-]/g, "_");
   const path = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${safe}`;
-  const up = await db.storage.from("attachments").upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: true });
+  const up = await db.storage.from("attachments").upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: false });
   if (up.error) throw new Error(up.error.message);
   return db.storage.from("attachments").getPublicUrl(path).data.publicUrl;
 }
@@ -351,11 +351,18 @@ async function submitCustomerRequest(state: ChatState, reply: (m: unknown[]) => 
   )]);
 }
 
-// ผูกบัญชี LINE กับ user ในระบบ ด้วยรหัส 6 หลักที่ออกจากหน้าเว็บ (อายุ 10 นาที)
+// ผูกบัญชี LINE กับ user ในระบบ ด้วยรหัสที่ออกจากหน้าเว็บ (8 หลัก · อายุ 10 นาที)
 async function tryStaffLink(uid: string, code: string, reply: (m: unknown[]) => Promise<void>): Promise<boolean> {
-  const { data: u } = await db.from("users").select("username, link_code_expires").eq("link_code", code).limit(1);
+  const { data: u } = await db.from("users")
+    .select("username, link_code_expires, active, line_user_id").eq("link_code", code).limit(1);
   const row = (u ?? [])[0];
   if (!row) return false;
+  if (row.active === false) { await reply([botTxt("บัญชีนี้ถูกปิดใช้งานอยู่ กรุณาติดต่อผู้ดูแลระบบค่ะ")]); return true; }
+  // กันการทับ LINE ที่ผูกไว้แล้วแบบเงียบ — ต้องยกเลิกการผูกในเว็บก่อน
+  if (row.line_user_id && row.line_user_id !== uid) {
+    await reply([botTxt("บัญชีนี้ผูกกับ LINE เครื่องอื่นไว้แล้วค่ะ\nกรุณายกเลิกการผูกในเว็บ (Settings → LINE Approval) แล้วสร้างรหัสใหม่ 🙏")]);
+    return true;
+  }
   if (row.link_code_expires && new Date(row.link_code_expires).getTime() < Date.now()) {
     await reply([botTxt("รหัสผูกบัญชีหมดอายุแล้ว กรุณาสร้างรหัสใหม่ในเว็บ (Settings → LINE Approval) ค่ะ")]);
     return true;
@@ -370,6 +377,10 @@ async function tryStaffLink(uid: string, code: string, reply: (m: unknown[]) => 
 async function handleStaffPostback(uid: string, data: string, reply: (m: unknown[]) => Promise<void>) {
   const staff = await staffByLine(uid);
   if (!staff) { await reply([botTxt("บัญชี LINE นี้ยังไม่ได้ผูกกับระบบ กรุณาผูกบัญชีในเว็บ (Settings → LINE Approval) ก่อนค่ะ")]); return; }
+  // เส้นทาง LINE ต้องผ่าน permission matrix เหมือนเว็บ (การ์ดเก่าในแชทกดไม่ได้หลังถูกลดสิทธิ์)
+  if (!["section", "manager"].includes(staff.role)) {
+    await reply([botTxt("บัญชีของท่านไม่มีสิทธิ์อนุมัติงานแล้วค่ะ กรุณาติดต่อผู้ดูแลระบบ")]); return;
+  }
   const p = new URLSearchParams(data);
   const act = p.get("act") ?? "", sheet = p.get("sheet") ?? "", id = p.get("id") ?? "";
   if (!sheet || !id) { await reply([botTxt("ข้อมูลรายการไม่ครบ กรุณาลองใหม่ค่ะ")]); return; }
@@ -389,6 +400,10 @@ async function handleStaffFlow(uid: string, state: ChatState, text: string, repl
   if (low === "ยกเลิก" || low === "cancel") { await clearChatState(uid); await reply([botTxt("ยกเลิกรายการแล้วค่ะ")]); return; }
   const staff = await staffByLine(uid);
   if (!staff) { await clearChatState(uid); await reply([botTxt("บัญชี LINE นี้ไม่ได้ผูกกับระบบแล้ว")]); return; }
+  if (!["section", "manager"].includes(staff.role)) {
+    await clearChatState(uid);
+    await reply([botTxt("บัญชีของท่านไม่มีสิทธิ์อนุมัติงานแล้วค่ะ")]); return;
+  }
   const sheet = String(state.data.sheet ?? ""), id = String(state.data.id ?? "");
   if (state.flow === "APPROVE_PIN") {
     if (!/^\d{4,6}$/.test(text)) { await reply([botTxt("PIN ต้องเป็นตัวเลข 4-6 หลักค่ะ")]); return; }
@@ -412,7 +427,19 @@ async function handleStaffFlow(uid: string, state: ChatState, text: string, repl
 
 async function handleLineEvent(token: string, ev: Record<string, any>) {
   // คุยเฉพาะแชท 1:1 กับลูกค้า — เงียบในกลุ่ม/ห้อง (กันเด้งเมนูใส่กลุ่มทีมงานที่ใช้เป็น Target แจ้งเตือน)
-  if (ev?.source?.type && ev.source.type !== "user") return;
+  // ยกเว้นคำสั่ง "groupid" — ใช้ตอนตั้งค่า Target ID ให้แจ้งเตือนเข้ากลุ่ม
+  // (บอทเงียบในกลุ่มจึงไม่มีทางรู้ groupId ได้เลย · reply ในกลุ่มไม่กินโควตา)
+  if (ev?.source?.type && ev.source.type !== "user") {
+    const gid = String(ev.source.groupId ?? ev.source.roomId ?? "");
+    const askedId = ev.type === "message" && ev.message?.type === "text" &&
+      /^\s*(group\s*id|groupid|targetid|target\s*id)\s*$/i.test(String(ev.message?.text ?? ""));
+    if (askedId && gid && ev.replyToken) {
+      await lineReply(token, ev.replyToken, [botTxt(
+        "🆔 Target ID ของห้องนี้:\n" + gid +
+        "\n\nนำไปวางที่ Settings → Notifications → LINE Target ID เพื่อให้แจ้งเตือนเข้ากลุ่มนี้ค่ะ")]);
+    }
+    return;
+  }
   const uid: string = ev?.source?.userId ?? "";
   if (!uid) return;
   const reply = async (msgs: unknown[]) => { if (ev.replyToken) await lineReply(token, ev.replyToken, msgs); };
@@ -435,7 +462,7 @@ async function handleLineEvent(token: string, ev: Record<string, any>) {
     return;
   }
   // ── STAFF: ผูกบัญชี — พิมพ์รหัส 6 หลักตอนยังไม่อยู่ใน flow ใด ──
-  if (m.type === "text" && (!state || !state.flow) && /^\d{6}$/.test(String(m.text ?? "").trim())) {
+  if (m.type === "text" && (!state || !state.flow) && /^\d{6,8}$/.test(String(m.text ?? "").trim())) {
     if (await tryStaffLink(uid, String(m.text).trim(), reply)) return;
     // ไม่ตรงรหัสผูกบัญชี → ตกไปที่ flow ลูกค้าตามปกติ
   }
@@ -561,9 +588,11 @@ async function handleLineEvent(token: string, ev: Record<string, any>) {
       let ref = "", proj = text;
       const { data: byJob } = await db.from("handovers").select("job_no, project_name, status").ilike("job_no", text).limit(1);
       let hit = (byJob ?? [])[0];
-      if (!hit) {
-        const { data: byName } = await db.from("handovers").select("job_no, project_name, status").ilike("project_name", `%${text}%`).limit(1);
-        hit = (byName ?? [])[0];
+      // ชื่อโครงการ: ต้องยาวพอ และต้อง match ได้ "แถวเดียว" เท่านั้นจึงผูกให้อัตโนมัติ
+      // (คำกว้าง ๆ จะ match หลายแถว → ไม่ผูก และไม่เอ่ยชื่อโครงการของลูกค้ารายอื่น)
+      if (!hit && text.length >= 6) {
+        const { data: byName } = await db.from("handovers").select("job_no, project_name, status").ilike("project_name", `%${text}%`).limit(2);
+        if ((byName ?? []).length === 1) hit = (byName ?? [])[0];
       }
       if (hit && (hit.status === "APPROVED" || hit.status === "COMPLETED")) { ref = hit.job_no; proj = hit.project_name; }
       state.data = { ...state.data, ref_job_no: ref, project_name: proj };
@@ -682,7 +711,7 @@ async function uploadOne(prefix: string, name: string, b64: string, mime: string
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   const safe = (name || "file").replace(/[^\w.\-]/g, "_");
   const path = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${safe}`;
-  const up = await db.storage.from("attachments").upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: true });
+  const up = await db.storage.from("attachments").upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: false });
   if (up.error) throw new Error(up.error.message);
   return db.storage.from("attachments").getPublicUrl(path).data.publicUrl;
 }
@@ -698,7 +727,7 @@ async function buildIssuePatch(folder: string, id: string, issue: IssuePayload |
   const patch: Record<string, unknown> = {
     issue_flag: has ? "HAS" : "NONE",
     issue_detail: has ? detail : "",
-    issue_files: "",
+    // ไม่ล้าง issue_files ที่นี่ — ไม่มีไฟล์ใหม่ = คงไฟล์หลักฐานเดิมไว้
   };
   let nFiles = 0;
   if (has && Array.isArray(issue.files) && issue.files.length) {
@@ -707,7 +736,7 @@ async function buildIssuePatch(folder: string, id: string, issue: IssuePayload |
       try { urls.push(`${f.name}::` + await uploadOne(`Issues/${folder}/${id}`, f.name, f.b64, f.mime)); }
       catch (_) { /* ไฟล์เดียวพังไม่ควรบล็อกการปิดงาน */ }
     }
-    patch.issue_files = urls.join("||");
+    if (urls.length) patch.issue_files = urls.join("||");
     nFiles = urls.length;
   }
   return { patch, has, detail, nFiles };
@@ -717,6 +746,58 @@ function dataUrlParts(d: unknown): { b64: string; mime: string } | null {
   return m ? { mime: m[1], b64: m[2] } : null;
 }
 
+// ── Storage: bucket เป็น private — อ่านไฟล์ต้องผ่าน signed URL ────────
+// URL ที่เก็บใน DB ยังเป็น "รูปแบบ public" เหมือนเดิม (จึงไม่ต้อง migrate ข้อมูลเก่า
+// และ rollback ได้ทันทีด้วยการเปิด bucket กลับเป็น public) — ใช้เป็นตัวชี้ path
+// แล้วแลกเป็น signed URL ตอนอ่านเท่านั้น
+const PUB_MARK = "/storage/v1/object/public/attachments/";
+const SIGN_TTL = 8 * 3600;                    // 8 ชม. = เท่าอายุ session
+function storagePath(u: unknown): string | null {
+  const s = String(u ?? "");
+  const i = s.indexOf(PUB_MARK);
+  if (i < 0) return null;
+  const p = s.slice(i + PUB_MARK.length).split("?")[0];
+  try { return decodeURIComponent(p); } catch { return p; }
+}
+// แลกหลาย URL พร้อมกัน 1 round trip — คืน map { urlเดิม: signed }
+// URL ที่ไม่ใช่ไฟล์ใน bucket (เช่น ลิงก์โครงการที่ผู้ใช้กรอก) จะไม่อยู่ใน map = ใช้ค่าเดิม
+async function signMany(list: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const keys: string[] = [], paths: string[] = [];
+  for (const u of list) { const p = storagePath(u); if (p) { keys.push(u); paths.push(p); } }
+  if (!paths.length) return out;
+  const store = db.storage.from("attachments");
+  // ทางหลัก: batch 1 round trip — ถ้า storage-js เวอร์ชันที่ resolve มาไม่มี createSignedUrls
+  // (หรือคืนค่าไม่ครบ) ค่อยถอยไปเซ็นทีละไฟล์ เพื่อไม่ให้เอกสาร/รูปพังทั้งหน้า
+  try {
+    const anyStore = store as unknown as {
+      createSignedUrls?: (p: string[], t: number) => Promise<{ data?: { signedUrl?: string }[] | null }>;
+    };
+    if (typeof anyStore.createSignedUrls === "function") {
+      const { data } = await anyStore.createSignedUrls(paths, SIGN_TTL);
+      (data ?? []).forEach((d, i) => { if (d?.signedUrl) out[keys[i]] = d.signedUrl; });
+    }
+  } catch (e) { console.error("signMany batch error:", e); }
+  for (let i = 0; i < paths.length; i++) {
+    if (out[keys[i]]) continue;
+    try {
+      const { data } = await store.createSignedUrl(paths[i], SIGN_TTL);
+      if (data?.signedUrl) out[keys[i]] = data.signedUrl;
+    } catch (e) { console.error("signMany single error:", paths[i], e); }
+  }
+  return out;
+}
+// เซ็นทุก URL ของ bucket ที่ฝังอยู่ใน HTML ของเอกสาร — ทำครั้งเดียว
+// หลังสร้าง HTML เสร็จ จึงไม่ต้องแก้ template PDF ทีละอัน
+async function signHtmlUrls(html: string): Promise<string> {
+  const re = /https?:\/\/[^\s"'<>()]+\/storage\/v1\/object\/public\/attachments\/[^\s"'<>()]+/g;
+  const found = Array.from(new Set(html.match(re) ?? []));
+  if (!found.length) return html;
+  const map = await signMany(found);
+  let out = html;
+  for (const u of found) if (map[u]) out = out.split(u).join(map[u]);
+  return out;
+}
 async function requireSession(token: string): Promise<{ username: string; role: string } | null> {
   if (!token) return null;
   const { data } = await db.from("sessions").select("*").eq("token", token).single();
@@ -727,6 +808,25 @@ async function requireSession(token: string): Promise<{ username: string; role: 
   if (u && u.active === false) { await db.from("sessions").delete().eq("token", token); return null; }
   return { username: data.username, role: data.role };
 }
+// ── State transition guard ─────────────────────────────────────────
+// UPDATE แบบ compare-and-swap: เขียนได้เมื่อสถานะเดิมอยู่ใน allowed เท่านั้น
+// คืน error เมื่อไม่มีแถวใดถูกแก้ (กดซ้ำ / สถานะเปลี่ยนไปแล้ว / ไม่พบรายการ)
+// → ปิดพร้อมกัน: อนุมัติซ้อน (เว็บ+LINE) / ข้ามสถานะ / ทิ้ง error ของ UPDATE
+async function guardedUpdate(
+  table: string, id: string, allowed: string[], patch: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await db.from(table).update(patch)
+    .eq("id", id).in("status", allowed).select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || !data.length) {
+    const { data: cur } = await db.from(table).select("status").eq("id", id).single();
+    return { ok: false, error: cur
+      ? `งานนี้อยู่สถานะ ${cur.status} แล้ว (ทำรายการนี้ไม่ได้) กรุณา refresh หน้าอีกครั้ง`
+      : "ไม่พบรายการ" };
+  }
+  return { ok: true };
+}
+
 // นับ manager ที่ยัง active อยู่ ยกเว้น username ที่ระบุ — ใช้กันไม่ให้เหลือ manager 0 คน (lockout)
 async function otherActiveManagers(excludeUsername: string): Promise<number> {
   const { count } = await db.from("users").select("*", { count: "exact", head: true })
@@ -749,7 +849,10 @@ async function doApprove(sheet: string, id: string, actorUser: string, actorRole
   if (!r.status) return { ok: false, error: "ไม่พบรายการ" };
   if (!["SUBMITTED", "RESUBMITTED"].includes(r.status)) return { ok: false, error: `งานนี้อยู่สถานะ ${r.status} แล้ว (อนุมัติได้เฉพาะที่รอพิจารณา)` };
   if ((sheet === "Handovers" || sheet === "LBSWorks") && r.source === "CUSTOMER" && actorRole !== "manager") return { ok: false, error: "งานลูกค้าต้องให้ Manager อนุมัติ" };
-  await db.from(t).update({ status: "APPROVED" }).eq("id", id);
+  // ประตูจริงของ transition — กันอนุมัติซ้อนจากเว็บ+LINE พร้อมกัน
+  // (กัน handover เงาซ้ำ + repair_count เด้ง 2 + push ลูกค้า 2 รอบ)
+  const gAp = await guardedUpdate(t, id, ["SUBMITTED", "RESUBMITTED"], { status: "APPROVED" });
+  if (!gAp.ok) return { ok: false, error: gAp.error };
   const label = sheet === "Handovers" ? "Project Handover"
     : sheet === "LBSWorks" ? (r.work_category === "EV" ? "EV Charger Work" : "LBS & Support Work") : sheet;
   await addLog(actorUser, `Approved ${label} ${r.job_no ?? id}`);
@@ -791,7 +894,8 @@ async function doReturn(sheet: string, id: string, comments: string, actorUser: 
   const { data: cur } = await db.from(t).select("job_no, source, status").eq("id", id).single();
   if (!cur) return { ok: false, error: "ไม่พบรายการ" };
   if (!["SUBMITTED", "RESUBMITTED"].includes(cur.status)) return { ok: false, error: `งานนี้อยู่สถานะ ${cur.status} แล้ว` };
-  await db.from(t).update({ status: "RETURNED", comments: comments ?? "" }).eq("id", id);
+  const gRt = await guardedUpdate(t, id, ["SUBMITTED", "RESUBMITTED"], { status: "RETURNED", comments: comments ?? "" });
+  if (!gRt.ok) return { ok: false, error: gRt.error };
   await addLog(actorUser, `Returned ${sheet} ${id}`);
   await notify("↩️ ตีกลับแก้ไข", `${sheet}: ${comments ?? "-"}`, false);
   if (cur.source === "CUSTOMER" && cur.job_no) {
@@ -928,7 +1032,7 @@ Deno.serve(async (req) => {
       }
 
       case "serverAddLog": {
-        await addLog((a[0] as string) || actor, (a[1] as string) || "");
+        await addLog(actor, (a[1] as string) || "");
         return ok({ success: true });
       }
 
@@ -953,7 +1057,7 @@ Deno.serve(async (req) => {
           updated_by: (a[1] as string) || actor,
           updated_at: new Date().toISOString(),
         });
-        await addLog((a[1] as string) || actor, "Updated notification settings");
+        await addLog(actor, "Updated notification settings");
         return ok({ success: true });
       }
       case "serverTestLine": {
@@ -962,7 +1066,7 @@ Deno.serve(async (req) => {
         if (!s?.line_channel_token) return ok({ success: false, error: "ยังไม่ได้ตั้งค่า LINE Channel Access Token" });
         const r = await sendLine(s.line_channel_token, s.line_target_id ?? "",
           `🔔 ข้อความทดสอบจาก ServiceMS\nโดย: ${(a[0] as string) || actor}\nเวลา: ${bkk()}\nหากเห็นข้อความนี้ในกลุ่ม แปลว่าการแจ้งเตือนพร้อมใช้งานค่ะ`);
-        await addLog((a[0] as string) || actor, `Tested LINE notification (${r.mode}) → ${r.ok ? "OK" : "FAIL " + r.status}`);
+        await addLog(actor, `Tested LINE notification (${r.mode}) → ${r.ok ? "OK" : "FAIL " + r.status}`);
         if (r.ok) return ok({ success: true, mode: r.mode, target: (s.line_target_id ?? "").trim() });
         // แปลสาเหตุที่พบบ่อยให้อ่านง่าย
         let hint = r.detail;
@@ -1001,7 +1105,7 @@ Deno.serve(async (req) => {
           { p_username: username, p_password: d.password, p_role: role, p_name: d.name ?? "" });
         if (error) return err(error.message);
         if (created === false) return err(`Username "${username}" มีอยู่แล้ว`);
-        await addLog((a[1] as string) || actor, `Created user ${username} (${role})`);
+        await addLog(actor, `Created user ${username} (${role})`);
         return ok({ success: true });
       }
       case "serverUpdateUser": {
@@ -1017,13 +1121,15 @@ Deno.serve(async (req) => {
           if (cur.role === "manager" && d.role !== "manager" && (await otherActiveManagers(uname)) < 1)
             return err("ต้องมี Manager ที่ใช้งานได้อย่างน้อย 1 คน — เปลี่ยน role ของ Manager คนสุดท้ายไม่ได้");
           patch.role = d.role;
+          // ลดสิทธิ์เป็น project → ถอนช่องทางอนุมัติผ่าน LINE ด้วย ไม่ใช่แค่ session
+          if (d.role === "project") { patch.line_user_id = null; patch.approve_pin_hash = null; }
           // เปลี่ยน role → sync session ที่ค้างให้ตรง (หรือเตะออกให้ล็อกอินใหม่)
           await db.from("sessions").delete().eq("username", uname);
         }
         if (!Object.keys(patch).length) return ok({ success: true });
         const { error } = await db.from("users").update(patch).eq("username", uname);
         if (error) return err(error.message);
-        await addLog(user || actor, `Updated user ${uname}${patch.role ? ` → role ${patch.role}` : ""}`);
+        await addLog(actor, `Updated user ${uname}${patch.role ? ` → role ${patch.role}` : ""}`);
         return ok({ success: true });
       }
       case "serverSetUserActive": {
@@ -1037,7 +1143,7 @@ Deno.serve(async (req) => {
         const { error } = await db.from("users").update({ active }).eq("username", uname);
         if (error) return err(error.message);
         if (!active) await db.from("sessions").delete().eq("username", uname); // เตะ session ทันที
-        await addLog(user || actor, `${active ? "Activated" : "Deactivated"} user ${uname}`);
+        await addLog(actor, `${active ? "Activated" : "Deactivated"} user ${uname}`);
         return ok({ success: true });
       }
       case "serverDeleteUser": {
@@ -1051,7 +1157,7 @@ Deno.serve(async (req) => {
         await db.from("sessions").delete().eq("username", uname);
         const { error } = await db.from("users").delete().eq("username", uname);
         if (error) return err(error.message);
-        await addLog(user || actor, `Deleted user ${uname}`);
+        await addLog(actor, `Deleted user ${uname}`);
         return ok({ success: true });
       }
       case "serverCheckLineQuota": {
@@ -1067,8 +1173,9 @@ Deno.serve(async (req) => {
         return ok({ linked: !!data?.line_user_id, hasPin: !!data?.approve_pin_hash });
       }
       case "serverGenLinkCode": {
-        // สุ่มรหัส 6 หลัก อายุ 10 นาที เก็บบน users row ของผู้ขอ
-        const code = String(Math.floor(100000 + Math.random() * 900000));
+        // สุ่มรหัส 8 หลัก อายุ 10 นาที เก็บบน users row ของผู้ขอ
+        const rnd = new Uint32Array(1); crypto.getRandomValues(rnd);
+        const code = String(10000000 + (rnd[0] % 90000000));   // 8 หลัก crypto-random
         const expires = new Date(Date.now() + 10 * 60_000).toISOString();
         await db.from("users").update({ link_code: code, link_code_expires: expires }).eq("username", actor);
         await addLog(actor, "Generated LINE link code");
@@ -1099,16 +1206,23 @@ Deno.serve(async (req) => {
           await db.from(t).delete().not(keyCol, "is", null);
           cleared += count ?? 0;
         }
-        await addLog((a[1] as string) || actor, `Reset data: ${sheets.join(", ")}`);
+        await addLog(actor, `Reset data: ${sheets.join(", ")}`);
         return ok({ success: true, totalCleared: cleared });
       }
 
       // ── CREATE ─────────────────────────────────────────────────────────
       case "serverCreateHandover": {
         const d = { ...(a[0] as Record<string, unknown>), status: "SUBMITTED", repair_count: 0 };
+        // Job No. ต้องไม่ซ้ำ ใน "ตารางเดียวกัน" เท่านั้น
+        // (ห้ามเช็กข้ามตาราง — handover เงาของ LBS/EV ใช้ job_no เดียวกันโดยเจตนา
+        //  ดู doApprove / serverPromoteHandover)
+        const jnH = String(d.job_no ?? "").trim();
+        if (!jnH) return err("กรุณาระบุ Job No.");
+        const { data: dupH } = await db.from("handovers").select("id").eq("job_no", jnH).limit(1);
+        if (dupH && dupH.length) return err(`Job No. ${jnH} มีอยู่แล้วในระบบ กรุณาตรวจสอบอีกครั้ง`);
         const { data, error } = await db.from("handovers").insert(d).select("id, job_no").single();
         if (error) return err(error.message);
-        await addLog((a[1] as string) || actor, `Created Handover ${data.job_no}`);
+        await addLog(actor, `Created Handover ${data.job_no}`);
         await notify("📋 Handover ใหม่ (SUBMITTED)", `${data.job_no} · ${d.project_name ?? "-"}\nโดย ${(a[1] as string) || actor}`); // กลุ่ม: แจ้งเตือนธรรมดา
         await pushApprovalCard("Handovers", data.id, "Project Handover", data.job_no, String(d.project_name ?? "-"), String((a[1] as string) || actor)); // manager: การ์ดอนุมัติ (ลิงก์+ปุ่ม)
         return ok({ success: true, id: data.id, job_no: data.job_no });
@@ -1117,9 +1231,13 @@ Deno.serve(async (req) => {
         const raw = a[0] as Record<string, unknown>;
         const d = { ...raw, status: "SUBMITTED", assigned_team: normTeam(raw.assigned_team) };
         const isEV = raw.work_category === "EV";
+        const jnL = String(d.job_no ?? "").trim();
+        if (!jnL) return err("กรุณาระบุ Job No.");
+        const { data: dupL } = await db.from("lbs_works").select("id").eq("job_no", jnL).limit(1);
+        if (dupL && dupL.length) return err(`Job No. ${jnL} มีอยู่แล้วในระบบ กรุณาตรวจสอบอีกครั้ง`);
         const { data, error } = await db.from("lbs_works").insert(d).select("id, job_no").single();
         if (error) return err(error.message);
-        await addLog((a[1] as string) || actor, `Created ${isEV ? "EV Charger Work" : "LBS Work"} ${data.job_no}`);
+        await addLog(actor, `Created ${isEV ? "EV Charger Work" : "LBS Work"} ${data.job_no}`);
         const lbSched = (d.planned_start || d.planned_end) ? `${d.planned_start ? dmyDash(d.planned_start) : "-"} → ${d.planned_end ? dmyDash(d.planned_end) : "-"}` : "ยังไม่ระบุ";
         const createTitle = isEV ? "🔌 EV ใหม่ (SUBMITTED)" : "⚡ LBS ใหม่ (SUBMITTED)";
         await notify(createTitle, `${data.job_no} · ${d.project_name ?? "-"}\n🗓️ ${lbSched} · โดย ${(a[1] as string) || actor}`); // กลุ่ม: แจ้งเตือนธรรมดา
@@ -1135,7 +1253,7 @@ Deno.serve(async (req) => {
         const raw = a[0] as Record<string, unknown>;
         const { no: letter_no, row } = await insertSharedNumbered("letters", LETTER_SOURCES, LETTER_PREFIX,
           (no) => ({ ...raw, letter_no: no, status: (raw.status as string) || "ISSUED" }));
-        await addLog((a[1] as string) || actor, `Issued Letter ${letter_no}`);
+        await addLog(actor, `Issued Letter ${letter_no}`);
         await notify("📄 ออกจดหมาย", `${letter_no} — ${raw.subject ?? ""}`, false);
         return ok({ success: true, id: (row as { id?: string }).id, letter_no });
       }
@@ -1144,14 +1262,17 @@ Deno.serve(async (req) => {
         const raw = a[0] as Record<string, unknown>;
         // Validate the referenced Handover exists and is APPROVED/COMPLETED.
         if (!raw.ref_job_no) return err("ต้องระบุ Ref Job (Handover) ก่อนสร้าง S.O.");
-        const { data: hv } = await db.from("handovers").select("id, repair_count, status").eq("job_no", raw.ref_job_no);
-        const handover = (hv ?? []).find((h: { status?: string }) => h.status === "APPROVED" || h.status === "COMPLETED");
+        // เลือกแบบ deterministic (เก่าสุดก่อน) — กัน repair_count เด้งใส่แถวซ้ำแบบสุ่ม
+        const { data: hv } = await db.from("handovers").select("id, repair_count, status")
+          .eq("job_no", raw.ref_job_no).in("status", ["APPROVED", "COMPLETED"])
+          .order("created_at", { ascending: true }).limit(1);
+        const handover = (hv ?? [])[0];
         if (!handover) return err("Handover ที่อ้างถึงต้องมีสถานะ APPROVED หรือ COMPLETED");
         const { no: so_no } = await insertSharedNumbered("service_orders", SOSR_SOURCES, "SO",
           (no) => ({ ...raw, so_no: no, status: raw.status || "PENDING", assigned_team: normTeam(raw.assigned_team) }));
         // bump repair_count on the validated handover (drives Top-3 ranking)
         await db.from("handovers").update({ repair_count: (handover.repair_count ?? 0) + 1 }).eq("id", handover.id);
-        await addLog((a[1] as string) || actor, `Created Service Order ${so_no}`);
+        await addLog(actor, `Created Service Order ${so_no}`);
         await notify("🔧 S.O. ใหม่", `${so_no} · ${raw.description ?? "-"}`);
         return ok({ success: true, so_no });
       }
@@ -1160,7 +1281,7 @@ Deno.serve(async (req) => {
         const { no: sr_no, row } = await insertSharedNumbered("service_reports", SOSR_SOURCES, "SR",
           (no) => ({ ...raw, sr_no: no, status: raw.status || "IN_PROGRESS" }));
         // Note: S.O. status is owned by the Repair Request (manual Done) — S.R. never changes it.
-        await addLog((a[1] as string) || actor, `Created Service Report ${sr_no}`);
+        await addLog(actor, `Created Service Report ${sr_no}`);
         await notify("📝 S.R. ใหม่", `${sr_no} · รวม ฿${raw.cost_total ?? 0}`, false);
         return ok({ success: true, sr_no, id: (row as { id?: string }).id });
       }
@@ -1181,8 +1302,10 @@ Deno.serve(async (req) => {
         if (files.length)  patch.attachment_files = join(cur?.attachment_files ?? "", files);
         if (sigT) patch.sig_technician = sigT;
         if (sigC) patch.sig_customer = sigC;
-        await db.from("service_reports").update(patch).eq("id", id);
-        await addLog(user || actor, `Completed Service Report ${id}`);
+        // อนุญาต DONE ด้วย — flow "New S.R." สร้างแถวเป็น DONE แล้วเรียก complete ต่อทันที
+        const gSr = await guardedUpdate("service_reports", id, ["IN_PROGRESS", "DONE"], patch);
+        if (!gSr.ok) return err(gSr.error!);
+        await addLog(actor, `Completed Service Report ${id}`);
         await notify("✅ S.R. เสร็จ", `บันทึก DONE โดย ${user || actor}`, false);
         return ok({ success: true });
       }
@@ -1204,9 +1327,10 @@ Deno.serve(async (req) => {
         const [id, user, issue] = a as [string, string, IssuePayload | null];
         const iss = await buildIssuePatch("Handovers", id, issue);
         if (iss.error) return err(iss.error);
-        await db.from("handovers").update({ status: "COMPLETED", ...iss.patch }).eq("id", id);
+        const gH = await guardedUpdate("handovers", id, ["APPROVED"], { status: "COMPLETED", ...iss.patch });
+        if (!gH.ok) return err(gH.error!);
         const { data: hC } = await db.from("handovers").select("job_no, project_name, project_manager").eq("id", id).single();
-        await addLog(user || actor, `Completed Handover ${hC?.job_no ?? id}${iss.has ? " · พบปัญหา" : ""}`);
+        await addLog(actor, `Completed Handover ${hC?.job_no ?? id}${iss.has ? " · พบปัญหา" : ""}`);
         // รายละเอียดปัญหาไม่ส่งเข้า LINE — ดูในเว็บ (หน้า detail) และในไฟล์ PDF เท่านั้น
         await notify("✅ Handover เสร็จ (COMPLETED)", `${hC?.job_no ?? id} · ${hC?.project_name ?? "-"}\nโดย ${user || actor}`);
         return ok({ success: true });
@@ -1218,18 +1342,21 @@ Deno.serve(async (req) => {
         if (lbCur.status !== "ASSIGNED") return err("ต้องมอบหมายทีม (ASSIGNED) ก่อนจึงปิดงาน LBS ได้");
         const iss = await buildIssuePatch("LBSWorks", id, issue);
         if (iss.error) return err(iss.error);
-        await db.from("lbs_works").update({ status: "COMPLETED", ...iss.patch }).eq("id", id);
+        const gL = await guardedUpdate("lbs_works", id, ["ASSIGNED"], { status: "COMPLETED", ...iss.patch });
+        if (!gL.ok) return err(gL.error!);
         const { data: lC } = await db.from("lbs_works").select("job_no, project_name, work_category").eq("id", id).single();
         const lbl = lC?.work_category === "EV" ? "EV" : "LBS";
-        await addLog(user || actor, `Completed ${lbl} ${lC?.job_no ?? id}${iss.has ? " · พบปัญหา" : ""}`);
+        await addLog(actor, `Completed ${lbl} ${lC?.job_no ?? id}${iss.has ? " · พบปัญหา" : ""}`);
         // รายละเอียดปัญหาไม่ส่งเข้า LINE — ดูในเว็บ (หน้า detail) และในไฟล์ PDF เท่านั้น
         await notify(`✅ ${lbl} เสร็จ (COMPLETED)`, `${lC?.job_no ?? id} · ${lC?.project_name ?? "-"}\nโดย ${user || actor}`);
         return ok({ success: true });
       }
       case "serverAssignTeam": {
         const [soId, teamArr, user] = a as [string, string[], string];
-        await db.from("service_orders").update({ assigned_team: normTeam(teamArr), status: "IN_PROGRESS" }).eq("id", soId);
-        await addLog(user || actor, `Assigned team to S.O. ${soId}`);
+        const gAt = await guardedUpdate("service_orders", soId, ["PENDING", "IN_PROGRESS"],
+          { assigned_team: normTeam(teamArr), status: "IN_PROGRESS" });
+        if (!gAt.ok) return err(gAt.error!);
+        await addLog(actor, `Assigned team to S.O. ${soId}`);
         const { data: soR } = await db.from("service_orders").select("so_no, description, planned_start, planned_finish, ref_job_no").eq("id", soId).single();
         const soNames = await teamNames(teamArr);
         await notify("🔧 มอบหมายซ่อม (ASSIGNED)", `${soR?.so_no ?? soId} · ${soR?.ref_job_no ?? "-"}\n👷 ${soNames}\n🗓️ ${soR?.planned_start ? dmyDash(soR.planned_start) : "-"} → ${soR?.planned_finish ? dmyDash(soR.planned_finish) : "-"}`);
@@ -1239,10 +1366,11 @@ Deno.serve(async (req) => {
       }
       case "serverAssignLBS": {
         const [lbsId, teamArr, start, end, user] = a as [string, string[], string, string, string];
-        await db.from("lbs_works").update({
+        const gAl = await guardedUpdate("lbs_works", lbsId, ["APPROVED", "ASSIGNED"], {
           assigned_team: normTeam(teamArr), planned_start: start || "", planned_end: end || "", status: "ASSIGNED",
-        }).eq("id", lbsId);
-        await addLog(user || actor, `Assigned team to LBS ${lbsId}`);
+        });
+        if (!gAl.ok) return err(gAl.error!);
+        await addLog(actor, `Assigned team to LBS ${lbsId}`);
         const { data: lbR } = await db.from("lbs_works").select("job_no, project_name, project_manager").eq("id", lbsId).single();
         const lbNames = await teamNames(teamArr);
         await notify("⚡ มอบหมาย LBS (ASSIGNED)", `${lbR?.job_no ?? lbsId} · ${lbR?.project_name ?? "-"}\n👷 ${lbNames}\n🗓️ ${start ? dmyDash(start) : "-"} → ${end ? dmyDash(end) : "-"}`);
@@ -1259,26 +1387,37 @@ Deno.serve(async (req) => {
           color: palette[(count ?? 0) % palette.length], active: true, photo: photoUrl,
         });
         if (error) return err(error.message);
-        await addLog((a[1] as string) || actor, `Added team member ${d.psp_id}`);
+        await addLog(actor, `Added team member ${d.psp_id}`);
         return ok({ success: true });
       }
       case "serverSetTeamPhoto": {
         const [psp_id, name, b64, mime, user] = a as [string, string, string, string, string];
         const url = await uploadOne(`Team/${psp_id}`, name || "photo.jpg", b64, mime || "image/jpeg");
         await db.from("team").update({ photo: url }).eq("psp_id", psp_id);
-        await addLog(user || actor, `Updated photo for ${psp_id}`);
+        await addLog(actor, `Updated photo for ${psp_id}`);
         return ok({ success: true, url });
       }
       case "serverUpdateBudget": {
         const [id, budget, user] = a as [string, number, string];
         await db.from("handovers").update({ warranty_budget: budget }).eq("id", id);
-        await addLog(user || actor, `Updated budget ${id} → ฿${budget}`);
+        await addLog(actor, `Updated budget ${id} → ฿${budget}`);
         return ok({ success: true });
       }
       case "serverUpdateRecord": {
         const [sheet, id, d, user] = a as [string, string, Record<string, unknown>, string];
         const t = TBL[sheet];
+        if (!t) return err("Bad sheet");
         const patch = { ...d };
+        // กันสถานะพิมพ์ผิด/ค่ามั่ว ที่จะทำให้แถวหลุดจากทุกตัวกรองใน UI
+        // (ยังปล่อยให้ manager แก้สถานะตรงได้เหมือนเดิม — เป็น escape hatch ที่ใช้งานจริง)
+        const ALLOWED_STATUS: Record<string, string[]> = {
+          handovers:       ["SUBMITTED", "RESUBMITTED", "APPROVED", "RETURNED", "COMPLETED"],
+          lbs_works:       ["SUBMITTED", "RESUBMITTED", "APPROVED", "ASSIGNED", "RETURNED", "COMPLETED"],
+          service_orders:  ["PENDING", "IN_PROGRESS", "DONE"],
+          service_reports: ["IN_PROGRESS", "DONE"],
+        };
+        if (typeof patch.status === "string" && ALLOWED_STATUS[t] && !ALLOWED_STATUS[t].includes(patch.status))
+          return err(`สถานะ "${patch.status}" ไม่ถูกต้องสำหรับรายการนี้`);
         // Immutable keys — editing a running/job number would orphan cross-module links.
         for (const k of ["job_no", "so_no", "sr_no", "letter_no"]) delete (patch as Record<string, unknown>)[k];
         if ("assigned_team" in patch) patch.assigned_team = normTeam(patch.assigned_team);
@@ -1298,7 +1437,7 @@ Deno.serve(async (req) => {
         const keyCol = t === "team" ? "psp_id" : "id";
         const { error } = await db.from(t).update(patch).eq(keyCol, id);
         if (error) return err(error.message);
-        await addLog(user || actor, deAssigned
+        await addLog(actor, deAssigned
           ? `Updated ${sheet} ${id} — ยกเลิกมอบหมาย (${patch.status}) ล้างทีม+แผนงาน`
           : `Updated ${sheet} ${id}`);
         if (deAssigned) await notify("↩️ ยกเลิกมอบหมาย LBS", `กลับเป็น ${patch.status} · ล้างทีม/แผนงานแล้ว\nโดย ${user || actor}`, false);
@@ -1307,6 +1446,7 @@ Deno.serve(async (req) => {
       case "serverDelete": {
         const [sheet, id] = a as [string, string];
         const t = TBL[sheet];
+        if (!t) return err("Bad sheet");
         const keyCol = t === "team" ? "psp_id" : "id";
         const { error } = await db.from(t).delete().eq(keyCol, id);
         if (error) return err(error.message);
@@ -1329,7 +1469,7 @@ Deno.serve(async (req) => {
         for (const k of (EDITABLE[t] ?? [])) if (d && k in d) patch[k] = (d as Record<string, unknown>)[k];
         const { error } = await db.from(t).update(patch).eq("id", id);
         if (error) return err(error.message);
-        await addLog(user || actor, `Resubmitted ${sheet} ${cur.job_no ?? id}`);
+        await addLog(actor, `Resubmitted ${sheet} ${cur.job_no ?? id}`);
         await notify("🔁 ส่งใหม่ (RESUBMITTED)", `${sheet === "handovers" ? "Handover" : "LBS"} ${cur.job_no ?? id}\nโดย ${user || actor}`); // กลุ่ม: แจ้งเตือนธรรมดา
         await pushApprovalCard(sheet, id, sheet === "handovers" ? "Project Handover" : "LBS & Support Work", String(cur.job_no ?? id), String(patch.project_name ?? "-"), String(user || actor)); // manager: การ์ดอนุมัติ
         return ok({ success: true });
@@ -1340,7 +1480,7 @@ Deno.serve(async (req) => {
         if (typeof lat !== "number" || typeof lng !== "number") return err("พิกัดไม่ถูกต้อง");
         const { error } = await db.from("checkins").insert({ kind, ref_no, lat, lng, label: label ?? "", project: project ?? "", status: status ?? "", who: user || actor });
         if (error) return err(error.message);
-        await addLog(user || actor, `Check-in ${kind} ${ref_no} @ ${lat.toFixed(5)},${lng.toFixed(5)}`);
+        await addLog(actor, `Check-in ${kind} ${ref_no} @ ${lat.toFixed(5)},${lng.toFixed(5)}`);
         return ok({ success: true });
       }
       case "serverPromoteHandover": {
@@ -1358,15 +1498,15 @@ Deno.serve(async (req) => {
           project_manager: w.project_manager, status: "COMPLETED", source: src, repair_count: 0,
         }).select("id").single();
         if (error) return err(error.message);
-        await addLog(user || actor, `Promoted ${src} ${w.job_no} → Handover`);
+        await addLog(actor, `Promoted ${src} ${w.job_no} → Handover`);
         return ok({ success: true, id: h.id });
       }
       case "serverCompleteSO": {
         const [id, user] = a as [string, string];
-        const { error } = await db.from("service_orders").update({ status: "DONE" }).eq("id", id);
-        if (error) return err(error.message);
+        const gSo = await guardedUpdate("service_orders", id, ["PENDING", "IN_PROGRESS"], { status: "DONE" });
+        if (!gSo.ok) return err(gSo.error!);
         const { data: so } = await db.from("service_orders").select("so_no").eq("id", id).single();
-        await addLog(user || actor, `Completed Service Order ${so?.so_no ?? id}`);
+        await addLog(actor, `Completed Service Order ${so?.so_no ?? id}`);
         await notify("🔧 S.O. เสร็จ (DONE)", `${so?.so_no ?? id} · โดย ${user || actor}`, false);
         // ความคืบหน้าหาลูกค้า (เฉพาะงานซ่อมที่แจ้งผ่าน LINE)
         await linePushRepairProgress(so?.so_no ?? "", `✅ งานซ่อมของท่านเสร็จสิ้นเรียบร้อยแล้วค่ะ\n\nเลขที่ใบสั่งงาน: ${so?.so_no ?? "-"}\n\nหากพบปัญหาเพิ่มเติม แจ้งได้ทุกเมื่อโดยพิมพ์ "แจ้งซ่อม" ขอบคุณที่ใช้บริการค่ะ 🙏`);
@@ -1431,7 +1571,7 @@ Deno.serve(async (req) => {
           const { data: made } = await db.from(destTbl).select("id").eq("job_no", job).limit(1);
           const madeId = (made ?? [])[0]?.id;
           if (madeId) await pushApprovalCard(rType === "PROJECT" ? "Handovers" : "LBSWorks", madeId, boxName, job, String(cr.project_name ?? "-"), `ลูกค้า ${cr.customer_name ?? "-"}`);
-          await addLog(user || actor, `Screened Customer Register (${rType}) → ${job} (SUBMITTED)`);
+          await addLog(actor, `Screened Customer Register (${rType}) → ${job} (SUBMITTED)`);
           await notify("📥 ส่งเข้าพิจารณา (SUBMITTED)", `${REGISTER_TYPES[rType]} ${job} · ${cr.project_name ?? "-"}\nตรวจโดย ${user || actor} → กล่อง ${boxName}`); // กลุ่ม: แจ้งเตือนธรรมดา
           await linePushToCustomer(cr.line_user_id, `📋 ข้อมูลลงทะเบียนรับประกันของท่านผ่านการตรวจสอบเบื้องต้นแล้วค่ะ\n\nประเภทงาน: ${REGISTER_TYPES[rType]}\nโครงการ: ${cr.project_name ?? "-"}\nขณะนี้อยู่ระหว่างรออนุมัติ จะแจ้งเลขงาน (Job No.) ให้ทราบทันทีที่อนุมัติค่ะ 🙏`);
         } else {
@@ -1440,8 +1580,10 @@ Deno.serve(async (req) => {
           // REPAIR — ต้องอ้างอิง Handover ที่ APPROVED/COMPLETED (เหมือน serverCreateSO)
           const ref = (extra?.ref_job_no || cr.ref_job_no || "").trim();
           if (!ref) return err("กรุณาเลือก Ref Job (Handover) ก่อนอนุมัติแจ้งซ่อม");
-          const { data: hv } = await db.from("handovers").select("id, repair_count, status").eq("job_no", ref);
-          const handover = (hv ?? []).find((h: { status?: string }) => h.status === "APPROVED" || h.status === "COMPLETED");
+          const { data: hv } = await db.from("handovers").select("id, repair_count, status")
+            .eq("job_no", ref).in("status", ["APPROVED", "COMPLETED"])
+            .order("created_at", { ascending: true }).limit(1);
+          const handover = (hv ?? [])[0];
           if (!handover) return err("Handover ที่อ้างถึงต้องมีสถานะ APPROVED หรือ COMPLETED");
           const photos = (cr.attachment_files ?? "").split("||").filter(Boolean)
             .map((it: string) => it.split("::")[1] || it).join("||");
@@ -1453,7 +1595,7 @@ Deno.serve(async (req) => {
           }));
           await db.from("handovers").update({ repair_count: (handover.repair_count ?? 0) + 1 }).eq("id", handover.id);
           resultRef = so_no;
-          await addLog(user || actor, `Approved Customer Repair Request → S.O. ${so_no}`);
+          await addLog(actor, `Approved Customer Repair Request → S.O. ${so_no}`);
           await notify("✅ อนุมัติแจ้งซ่อมลูกค้า", `S.O. ${so_no} · Ref ${ref}\nผู้แจ้ง ${cr.customer_name ?? "-"} · โดย ${user || actor}`);
           await linePushToCustomer(cr.line_user_id, `✅ การแจ้งซ่อมของท่านได้รับการอนุมัติแล้วค่ะ\n\nเลขที่ใบสั่งงาน: ${so_no}\nโครงการอ้างอิง: ${ref}\n\nทีมช่างจะติดต่อนัดหมายเข้าดำเนินการค่ะ 🙏`);
           await db.from("customer_requests").update({ ref_job_no: ref }).eq("id", id);
@@ -1476,7 +1618,7 @@ Deno.serve(async (req) => {
           reviewed_at: new Date().toISOString(),
         }).eq("id", id);
         const isReg = cr.kind === "REGISTER";
-        await addLog(user || actor, `Rejected Customer ${isReg ? "Register" : "Repair Request"} (${cr.customer_name || cr.line_display_name || id})`);
+        await addLog(actor, `Rejected Customer ${isReg ? "Register" : "Repair Request"} (${cr.customer_name || cr.line_display_name || id})`);
         await notify(`❌ ปฏิเสธ${isReg ? "ลงทะเบียน" : "แจ้งซ่อม"}ลูกค้า`, `${cr.customer_name ?? "-"} · เหตุผล: ${reason ?? "-"}\nโดย ${user || actor}`);
         await linePushToCustomer(cr.line_user_id, `❌ ขออภัยค่ะ ${isReg ? "การลงทะเบียนรับประกัน" : "การแจ้งซ่อม"}ของท่านไม่ผ่านการพิจารณา\n\nเหตุผล: ${reason || "-"}\n\nท่านสามารถส่งข้อมูลใหม่อีกครั้ง โดยพิมพ์ "${isReg ? "ลงทะเบียน" : "แจ้งซ่อม"}" ค่ะ 🙏`);
         return ok({ success: true });
@@ -1487,8 +1629,9 @@ Deno.serve(async (req) => {
         const [name, b64, mime, sheet, id] = a as [string, string, string, string, string];
         const t = TBL[sheet];
         const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-        const path = `${sheet}/${id}/${Date.now()}_${name.replace(/[^\w.\-]/g, "_")}`;
-        const up = await db.storage.from("attachments").upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: true });
+        if (!t) return err("Bad sheet");
+        const path = `${sheet}/${id}/${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${name.replace(/[^\w.\-]/g, "_")}`;
+        const up = await db.storage.from("attachments").upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: false });
         if (up.error) return err(up.error.message);
         const { data: pub } = db.storage.from("attachments").getPublicUrl(path);
         const url = pub.publicUrl;
@@ -1499,12 +1642,20 @@ Deno.serve(async (req) => {
         return ok({ success: true, url });
       }
 
+      // ── Storage read access (bucket เป็น private) ────────────────────
+      // แลก URL ที่เก็บใน DB → signed URL (ทุก role ที่ล็อกอินอยู่อ่านไฟล์ได้เหมือนเดิม)
+      case "serverSignUrls": {
+        const list = (Array.isArray(a[0]) ? a[0] as unknown[] : []).slice(0, 300).map(String);
+        return ok(await signMany(list));
+      }
+
       // ── PDF (server builds HTML; frontend prints it) ─────────────────────
       case "serverGeneratePDF": {
         const [type, id] = a as [string, string];
         const html = await buildPdf(type, id);
         if (!html) return err("Record not found");
-        return ok({ success: true, html });
+        // bucket เป็น private → เซ็น URL รูป/ลายเซ็นในเอกสารก่อนส่งให้เบราว์เซอร์พิมพ์
+        return ok({ success: true, html: await signHtmlUrls(html) });
       }
 
       default:

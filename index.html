@@ -642,17 +642,17 @@ function openAttachment(url){
   if(!isStorageUrl(url)){window.open(url,'_blank');return;}
   var w=window.open('','_blank');
   signUrls([url]).then(function(map){
-    if(!map[url]){if(w)w.close();alert('⚠️ เปิดไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง');return;}
-    if(w)w.location.href=map[url]; else window.open(map[url],'_blank');
+    /* เซ็นไม่สำเร็จ (เช่น backend ยังไม่มี serverSignUrls) → ใช้ URL เดิม
+       ซึ่งยังเปิดได้ตรงๆ ตราบที่ bucket ยัง public
+       → frontend ใหม่ทำงานได้กับ backend ทั้งเก่าและใหม่ เลิกผูกลำดับ deploy */
+    var target=map[url]||url;
+    if(w)w.location.href=target; else window.open(target,'_blank');
   });
 }
 /* คัดลอกลิงก์ — ได้ signed URL อายุ 8 ชม. (ไม่ใช่ลิงก์สาธารณะถาวรเหมือนเดิม) */
 function copyAttachment(btn,url){
   if(!isStorageUrl(url)){copyLink(btn,url);return;}
-  signUrls([url]).then(function(map){
-    if(!map[url]){alert('⚠️ คัดลอกลิงก์ไม่สำเร็จ กรุณาลองอีกครั้ง');return;}
-    copyLink(btn,map[url]);
-  });
+  signUrls([url]).then(function(map){copyLink(btn,map[url]||url);});
 }
 /* hook เดียวครอบทุกจุด render (renderPage / openModal / notif panel / ฯลฯ)
    สังเกตเฉพาะ childList จึงไม่วนซ้ำตอนเซ็ต src เอง (และ signed URL เป็น /object/sign/ จึงไม่ match อีก) */

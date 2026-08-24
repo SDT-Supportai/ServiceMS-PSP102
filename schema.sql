@@ -473,19 +473,27 @@ insert into team (psp_id, name, position, phone, color, active) values
 on conflict (psp_id) do nothing;
 
 -- ─────────────────────────────────────────────────────────────────────────
--- 11) STORAGE BUCKET  (public read; writes happen via service-role only)
+-- 11) STORAGE BUCKET  (PRIVATE — อ่านผ่าน signed URL เท่านั้น · เขียนผ่าน service-role)
+--
+-- เดิม bucket นี้เป็น public:true + policy select ทั้ง bucket ซึ่งเปิดกว้างเกินไป 2 ชั้น:
+--   (1) ใครมีลิงก์ (หรือเดา path ได้) อ่านลายเซ็นลูกค้า/เอกสารประกัน/รูปซ่อมได้ทันที
+--   (2) policy select ทั้ง bucket ทำให้ anon key เรียก storage list() ไล่ path ได้ทั้งถัง
+-- ตอนนี้: ไม่มี policy select (ปิด list) + bucket ใหม่เป็น private
+-- โค้ดฝั่ง server มี signMany()/signHtmlUrls() แลก signed URL อายุ 8 ชม. ให้แล้ว
+--
+-- ⚠️ instance ที่ใช้งานอยู่แล้ว: `on conflict do nothing` ด้านล่างจะ "ไม่" แตะ bucket เดิม
+--    (bucket เดิมยังเป็น public จนกว่าจะรัน migrate-private-bucket.sql)
+--    → รัน schema.sql ทับ instance ที่ live ได้ปลอดภัย ไม่ทำรูปพังกลางวัน
+--    การ flip เป็น private ต้องทำ "หลัง" deploy api + frontend ชุดใหม่ ดู migrate-private-bucket.sql
 -- ─────────────────────────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public)
-values ('attachments', 'attachments', true)
+values ('attachments', 'attachments', false)
 on conflict (id) do nothing;
 
--- allow anyone to READ files (public links in the UI); uploads are server-side
-do $$ begin
-  if not exists (select 1 from pg_policies where policyname = 'attachments public read') then
-    create policy "attachments public read" on storage.objects
-      for select using ( bucket_id = 'attachments' );
-  end if;
-end $$;
+-- ปิดช่องไล่ไฟล์ทั้งถังด้วย anon key (storage list) — ปลอดภัยกับ instance ที่ live อยู่
+-- เพราะ URL รูปแบบ /object/public/... ของ bucket ที่ public อยู่ "ไม่" ผ่าน RLS
+-- (ลบ policy = list ไม่ได้อีก แต่รูป/ไฟล์เดิมที่แสดงอยู่ยังเปิดได้ปกติ)
+drop policy if exists "attachments public read" on storage.objects;
 
 -- Done. Default logins:
 --   manager / manager102   (full access + System Settings)
