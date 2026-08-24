@@ -941,7 +941,7 @@ function attachListHtml(rec){
 var mapTrackInstance=null;
 function projectTH(lat,lng){var latN=20.7,latS=5.5,lngW=97.3,lngE=105.7;return {x:Math.max(2,Math.min(98,(lng-lngW)/(lngE-lngW)*100)),y:Math.max(2,Math.min(98,(latN-lat)/(latN-latS)*100))};}
 function mapFallback(pts){
-  var pins=pts.map(function(c){var p=projectTH(c.lat,c.lng);return '<div title="'+esc((c.kind==='LBS'?'⚡ ':'🔧 ')+(c.ref_no||'')+' '+(c.label||''))+'" style="position:absolute;left:'+p.x+'%;top:'+p.y+'%;transform:translate(-50%,-100%);font-size:20px;line-height:1">📍</div>';}).join('');
+  var pins=pts.map(function(c){var p=projectTH(c.lat,c.lng);return '<div title="'+esc((c.ref_no||'—')+((c.project||c.label)?' · '+(c.project||c.label):''))+'" style="position:absolute;left:'+p.x+'%;top:'+p.y+'%;transform:translate(-50%,-100%);font-size:20px;line-height:1">📍</div>';}).join('');
   return '<div style="position:relative;height:100%;min-height:360px;background:linear-gradient(180deg,#eaf3ff,#f3f8ff)">'
     +'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c2d3e8;font-weight:800;font-size:1.3rem;letter-spacing:1px">🇹🇭 ประเทศไทย</div>'
     +pins
@@ -957,7 +957,7 @@ function initMapTracking(){
       var map=L.map(el).setView([13.0,101.0],5);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
       mapTrackInstance=map;var bounds=[];
-      pts.forEach(function(c){var mk=L.marker([c.lat,c.lng]).addTo(map);mk.bindPopup('<b>'+(c.kind==='LBS'?'⚡ LBS & Support':c.kind==='SO'?'🔧 Repair Order':'🔧 Service Report')+'</b><br>'+esc(c.ref_no||'')+((c.project||c.label)?'<br>'+esc(c.project||c.label):'')+(c.status?'<br>สถานะ: '+esc(c.status):'')+'<br><span style="color:#888;font-size:11px">'+esc(c.who||'')+' · '+esc(c.created_at?String(c.created_at).slice(0,16).replace('T',' '):'')+'</span>');bounds.push([c.lat,c.lng]);});
+      pts.forEach(function(c){var mk=L.marker([c.lat,c.lng]).addTo(map);mk.bindTooltip('<b>'+esc(c.ref_no||'—')+'</b>'+((c.project||c.label)?'<br>'+esc(c.project||c.label):''),{direction:'top',opacity:.95});mk.bindPopup('<b>'+(c.kind==='LBS'?'⚡ LBS & Support':c.kind==='SO'?'🔧 Repair Order':'🔧 Service Report')+'</b><br>'+esc(c.ref_no||'')+((c.project||c.label)?'<br>'+esc(c.project||c.label):'')+(c.status?'<br>สถานะ: '+esc(c.status):'')+'<br><span style="color:#888;font-size:11px">'+esc(c.who||'')+' · '+esc(c.created_at?String(c.created_at).slice(0,16).replace('T',' '):'')+'</span>');bounds.push([c.lat,c.lng]);});
       if(bounds.length)map.fitBounds(bounds,{padding:[40,40],maxZoom:12});
       setTimeout(function(){try{map.invalidateSize();}catch(e){}},150);
     }catch(e){el.innerHTML=mapFallback(pts);}
@@ -1381,14 +1381,11 @@ function statusStepper(kind,status,rec){
   var retTag=returned?'<span class="step-ret-tag">↩️ ส่งกลับให้แก้ไข</span>':'';
   return '<div class="stepper'+(returned?' returned':'')+'">'+steps+retTag+'</div>';
 }
-var hoSubTab='handover';
-function hoTabBtn(cur,id,label){return '<div class="stab'+(cur===id?' active':'')+'" onclick="setHoTab(\''+id+'\')">'+label+'</div>';}
-function setHoTab(t){hoSubTab=t;var el=document.getElementById('pageContent');if(el)el.innerHTML=renderHandoverList();}
+/* sub-tab "Repair Requests" / "Service Reports" ถอดออกแล้ว (2026-08-24)
+   ทั้งสองเคยเรียก renderServiceOrders() / renderServiceReports() ตัวเดียวกับเมนู
+   Repair Requests / Service Reports ใน module "4 · Handover & Warranty" จึงซ้ำซ้อน 100%
+   หน้านี้เหลือหน้าที่เดียว = ทะเบียน Handover · ทางเข้างานซ่อมใช้เมนูใน sidebar */
 function renderHandoverList(){
-  var tab=hoSubTab||'handover';
-  var bar='<div class="stabs" style="margin-bottom:14px">'+hoTabBtn(tab,'handover','📋 Project Handover')+hoTabBtn(tab,'repair','🔧 Repair Requests')+hoTabBtn(tab,'reports','📝 Service Reports')+'</div>';
-  if(tab==='repair')return bar+renderServiceOrders();
-  if(tab==='reports')return bar+renderServiceReports();
   var hos=DB.handovers.filter(function(h){return !['SUBMITTED','RESUBMITTED'].includes(h.status)});
   function hoRow(h){return '<tr data-status="'+h.status+'"><td style="font-family:var(--mono);font-size:.78rem;cursor:pointer;color:var(--blue)" onclick="showHandoverDetail(\''+h.id+'\')">'+esc(h.job_no)+'</td><td>'+esc(h.project_name)+'</td><td style="font-size:.78rem">'+esc(h.customer_name||'—')+'</td><td style="font-size:.75rem"><div>'+esc(h.customer_contact||'—')+'</div><div style="color:var(--text-3)">'+esc(h.phone||'')+'</div></td><td style="font-size:.72rem">'+(h.warranty_type||'—')+'<br><span style="color:var(--text-3)">'+fmtDate(h.warranty_start)+' → '+fmtDate(h.warranty_end)+'</span></td><td style="font-family:var(--mono)">'+fmtTHBShort(h.warranty_budget)+'</td><td><span class="sts '+stsCls(h.status)+'">'+h.status+'</span>'+issueBadge(h)+'</td>'
       +'<td style="white-space:nowrap"><button class="btn btn-sec btn-sm" onclick="showHandoverDetail(\''+h.id+'\')">&#128065; View</button> '
@@ -1402,8 +1399,7 @@ function renderHandoverList(){
   var gLBS=hos.filter(function(h){return h.source==='LBS'});
   var gEV=hos.filter(function(h){return h.source==='EV'});
   var gCust=hos.filter(function(h){return h.source==='CUSTOMER'});
-  return bar
-    +hoGroup('Project Handover (สร้างเอง)','📋',gDirect,'direct')
+  return hoGroup('Project Handover (สร้างเอง)','📋',gDirect,'direct')
     +hoGroup('อ้างอิงจาก LBS Project · ออก Warranty แล้ว','⚡',gLBS,'lbs')
     +hoGroup('อ้างอิงจาก EV Charger Project · ออก Warranty แล้ว','🔌',gEV,'ev')
     +hoGroup('ลูกค้าลงทะเบียนผ่าน LINE · Customer Register','🛡️',gCust,'cust');
