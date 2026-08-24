@@ -1,0 +1,67 @@
+name: Deploy static site to GitHub Pages
+
+# ✅ workflow นี้คือสายพาน deploy ของ production instance 1 (ยืนยัน 2026-08-23)
+#    Live: https://sdt-supportai.github.io/ServiceMS-PSP102/
+#    (HANDOFF §2 เคยเขียนว่าย้ายไป Netlify แล้ว — ไม่จริง: URL Netlify ตอบ 404 ทุก path
+#     ส่วน Pages เสิร์ฟอยู่จริง และไฟล์บนนั้นตรงกับชุดที่ step "Stage static site" copy เป๊ะ)
+#
+# 🔴 บั๊กที่เคยทำ production ล่ม: step นั้น copy แค่ index.html ไม่ copy config.js
+#    ซึ่ง index.html:8 ต้องใช้อ่าน SUPABASE_URL + anon key → เว็บขึ้นหน้า
+#    "ยังไม่ได้ตั้งค่าการเชื่อมต่อระบบ" ล็อกอินไม่ได้ทั้งระบบ  (แก้แล้วด้านล่าง)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:       # กด Run เองได้จากแท็บ Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ให้ deploy ทีละครั้ง ไม่ยกเลิกตัวที่กำลังรัน (กันปัญหา "Canceling deployment")
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # เก็บเฉพาะไฟล์ที่ต้องเสิร์ฟจริง → artifact เล็ก, ไม่รวม backend (index.ts, schema.sql,
+      # migrate-private-bucket.sql) และไม่รวม deploy-new-org/ ของ instance 2
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp config.js  _site/          # ⚠️ ห้ามลบบรรทัดนี้ — ไม่มี config.js = ล็อกอินไม่ได้ทั้งระบบ
+          [ -f _headers ] && cp _headers _site/ || true                        # Pages ไม่ใช้ แต่ติดไปด้วยเผื่อย้าย host
+          [ -f manual-project-role.html ] && cp manual-project-role.html _site/ || true
+          touch _site/.nojekyll
+
+      # กันพลาดซ้ำ: ถ้า config.js ยังเป็น placeholder ให้ build ล้มที่นี่
+      # ดีกว่าปล่อยไป publish แล้วผู้ใช้เจอหน้า "ยังไม่ได้ตั้งค่าการเชื่อมต่อระบบ"
+      - name: Verify config.js has a real key
+        run: |
+          test -f _site/config.js || { echo "::error::ไม่พบ config.js ใน _site"; exit 1; }
+          if grep -q 'PASTE_YOUR_ANON_KEY_HERE\|YOUR_PUBLIC_ANON_KEY' _site/config.js; then
+            echo "::error::config.js ยังเป็น placeholder — ใส่ anon key จริงก่อน deploy"; exit 1
+          fi
+          echo "config.js OK — $(grep -o "APP_VERSION: '[^']*'" _site/config.js)"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
