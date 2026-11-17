@@ -1228,20 +1228,20 @@ section:[
   {s:'Insight',items:[
     {id:'dashboard',l:'Dashboard',ic:'&#128202;'},
     {id:'map-tracking',l:'Map Tracking',ic:'&#128506;&#65039;'}]},
+  {s:'1 \u00b7 Intake',items:[
+    {id:'letters',l:'Service Letter',ic:'&#9993;&#65039;'}]},
   {s:'2 \u00b7 Approval Queue',items:[
     {id:'approval-inbox',l:'Job Under Review',ic:'&#128229;',b:pendingCount},
     {id:'customer-requests',l:'Customer Requests',ic:'&#128232;',b:custPendingAll}]},
   {s:'3 \u00b7 Field Operations',items:[
-    {id:'lbs-list',l:'LBS Jobs',ic:'&#9889;',b:lbsActiveCount},
-    {id:'ev-list',l:'EV Charger Jobs',ic:'&#128267;',b:evActiveCount},
-    {id:'team-management',l:'Team & Scheduling',ic:'&#128101;'}]},
+    {id:'lbs-list',l:'LBS & Service Jobs',ic:'&#9889;',b:lbsActiveCount},
+    {id:'ev-list',l:'EV Charger Jobs',ic:'&#128267;',b:evActiveCount}]},
   {s:'4 \u00b7 Handover & Warranty',items:[
     {id:'handover-list',l:'Handover Registry',ic:'&#128203;'},
     {id:'service-orders',l:'Repair Requests',ic:'&#128295;',b:openSOCount},
     {id:'service-reports',l:'Service Reports',ic:'&#128221;'}]},
-  {s:'Documents',items:[
-    {id:'letters',l:'Service Letter',ic:'&#9993;&#65039;'}]},
   {s:'Administration',items:[
+    {id:'team-management',l:'Team & Scheduling',ic:'&#128101;'},
     {id:'line-approval',l:'LINE Approval',ic:'&#128241;'}]}
 ],
 manager:[
@@ -1251,21 +1251,20 @@ manager:[
   {s:'1 \u00b7 Intake',items:[
     {id:'create-handover',l:'Create Handover',ic:'&#128203;'},
     {id:'create-lbs',l:'Create LBS & Service Work',ic:'&#9889;'},
-    {id:'create-ev',l:'Create EV Charger',ic:'&#128267;'}]},
+    {id:'create-ev',l:'Create EV Charger',ic:'&#128267;'},
+    {id:'letters',l:'Service Letter',ic:'&#9993;&#65039;'}]},
   {s:'2 \u00b7 Approval Queue',items:[
     {id:'approval-inbox',l:'Job Under Review',ic:'&#128229;',b:pendingCount},
     {id:'customer-requests',l:'Customer Requests',ic:'&#128232;',b:custPendingAll}]},
   {s:'3 \u00b7 Field Operations',items:[
-    {id:'lbs-list',l:'LBS Jobs',ic:'&#9889;',b:lbsActiveCount},
-    {id:'ev-list',l:'EV Charger Jobs',ic:'&#128267;',b:evActiveCount},
-    {id:'team-management',l:'Team & Scheduling',ic:'&#128101;'}]},
+    {id:'lbs-list',l:'LBS & Service Jobs',ic:'&#9889;',b:lbsActiveCount},
+    {id:'ev-list',l:'EV Charger Jobs',ic:'&#128267;',b:evActiveCount}]},
   {s:'4 \u00b7 Handover & Warranty',items:[
     {id:'handover-list',l:'Handover Registry',ic:'&#128203;'},
     {id:'service-orders',l:'Repair Requests',ic:'&#128295;',b:openSOCount},
     {id:'service-reports',l:'Service Reports',ic:'&#128221;'}]},
-  {s:'Documents',items:[
-    {id:'letters',l:'Service Letter',ic:'&#9993;&#65039;'}]},
   {s:'Administration',items:[
+    {id:'team-management',l:'Team & Scheduling',ic:'&#128101;'},
     {id:'user-management',l:'User Management',ic:'&#128100;'},
     {id:'line-approval',l:'LINE Approval',ic:'&#128241;'},
     {id:'settings',l:'System Settings',ic:'&#9881;&#65039;'}]}
@@ -2547,6 +2546,25 @@ function saveWarrantyLetter(id){
 ═══════════════════════════════════════════════════════ */
 function openNewSO(jobNo){gsr('serverGetNextSO').then(function(soNo){var opts=DB.handovers.filter(function(h){return h.status==='APPROVED'||h.status==='COMPLETED'}).map(function(h){return '<option value="'+h.job_no+'" '+(h.job_no===jobNo?'selected':'')+'>'+esc(h.job_no)+' — '+esc(h.project_name)+'</option>'}).join('');var body='<div class="frow"><div class="fg"><label>S.O. No.</label><input id="f_so_no" value="'+soNo+'" readonly style="background:var(--bg-elevated);font-family:var(--mono)"></div><div class="fg"><label>Reference Handover</label><select id="f_so_ref">'+opts+'</select></div></div><div class="frow"><div class="fg"><label>Request Date</label><input type="date" id="f_so_date" value="'+new Date().toISOString().slice(0,10)+'"></div><div class="fg"><label>Planned Start</label><input type="date" id="f_so_start"></div></div><div class="frow"><div class="fg"><label>Planned Finish</label><input type="date" id="f_so_finish"></div></div><div class="frow full"><div class="fg"><label>Description</label><textarea id="f_so_desc" placeholder="Describe the issue..."></textarea></div></div>';openModal('🔧 New Service Order',body,'<button class="btn btn-pri" onclick="createSO()">Create S.O.</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button>');}).catch(function(e){alert('⚠️ '+uiErr(e))});}
 function createSO(){var data={ref_job_no:document.getElementById('f_so_ref').value,request_date:document.getElementById('f_so_date').value,planned_start:document.getElementById('f_so_start').value||'',planned_finish:document.getElementById('f_so_finish').value||'',status:'PENDING',description:document.getElementById('f_so_desc').value.trim()||'',assigned_team:'',before_photos:''};if(!data.ref_job_no){alert('Select a reference handover');return;}showLoading('Creating...');gsr('serverCreateSO',data,curUser).then(function(r){if(r.success){return loadAllData().then(function(){hideLoading();closeModal();navigateTo(curPage);alert('✅ Created '+r.so_no)})}else{hideLoading();alert('⚠️ '+uiErr(r.error));}}).catch(function(e){hideLoading();alert('⚠️ '+uiErr(e))});}
+/* เอกสารแนบของ S.O. — before_photos เก็บเป็น URL ล้วน (ชื่อไฟล์จริงอยู่ท้าย path: <เวลา>_<สุ่ม5>_<ชื่อ>)
+   รูป → ภาพย่อ (src ของ bucket ถูกแลกเป็น signed URL อัตโนมัติ), ไฟล์อื่น → แถวลิงก์แบบเดียวกับหน้าอื่น */
+function soAttachHtml(so){
+  var urls=String(so.before_photos||'').split('||').map(function(s){s=s.trim();var p=s.split('::');return p.length>1?p[1]:s;}).filter(Boolean);
+  var imgs='',docs='';
+  urls.forEach(function(u){
+    var base=decodeURIComponent((u.split('?')[0].split('/').pop())||'file').replace(/^\d{10,}_[a-z0-9]{1,6}_/i,'');
+    var ext=(base.split('.').pop()||'').toLowerCase();
+    if(/^(jpe?g|png|gif|webp|heic|bmp)$/.test(ext)||base.indexOf('.')<0){
+      imgs+='<a href="javascript:void(0)" onclick="openAttachment(\''+escJs(u)+'\')" title="'+esc(base)+'" style="display:block;width:96px;height:96px;border-radius:var(--r-sm);overflow:hidden;border:1px solid var(--border-s);background:var(--bg-elevated)"><img src="'+esc(u)+'" alt="'+esc(base)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover"></a>';
+    }else{
+      var icon=ext==='pdf'?'📄':(ext==='doc'||ext==='docx')?'📝':(ext==='xls'||ext==='xlsx')?'📊':'📎';
+      docs+=attachItemHtml(icon+' '+esc(base),u);
+    }
+  });
+  var extra=so.attachment_files?attachListHtml({attachment_files:so.attachment_files}):'';
+  if(!imgs&&!docs&&!extra)return '<span class="attach-none">— ไม่มีไฟล์แนบ —</span>';
+  return (imgs?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">'+imgs+'</div>':'')+docs+extra;
+}
 function showSODetail(id){
   var so=DB.serviceOrders.find(function(x){return x.id===id});if(!so)return;
   var team=Array.isArray(so.assigned_team)?so.assigned_team.filter(Boolean).map(function(t){return esc(getTeamName(t))}).join(', '):'';
@@ -2562,6 +2580,7 @@ function showSODetail(id){
     +'<div class="detail-item detail-full"><div class="di-l">Team</div><div class="di-v">'+(team||'<span style="color:var(--text-3)">ยังไม่ได้มอบหมาย</span>')+'</div></div>'
     +'</div>';
   if(so.description){body+='<div class="detail-section-title">&#128221; Description</div><div style="background:var(--bg-surface);border:1px solid var(--border-s);border-radius:var(--r-sm);padding:12px 14px;font-size:.84rem;line-height:1.7">'+esc(so.description).replace(/\n/g,'<br>')+'</div>';}
+  body+='<div class="detail-section-title">&#128206; เอกสารแนบ</div>'+soAttachHtml(so);
   var footer='';
   if(so.status==='IN_PROGRESS'&&can('complete'))footer+='<button class="btn btn-complete btn-sm" onclick="closeModal();completeSO(\''+so.id+'\')">✔ Done</button>';
   if(can('editRecord'))footer+='<button class="btn btn-pri btn-sm" onclick="closeModal();openEditSO(\''+so.id+'\')">✏️ Edit</button>';
@@ -2816,13 +2835,38 @@ function printWorkReport(id,type){
   addLog('Generated '+lbl+' Work Report '+l.job_no);
 }
 
+/* ── Service Letter: เอกสารแนบ (letters.attachment_files "name::url||...") ── */
+function ltAttachField(inpId,listId){return '<div class="frow full"><div class="fg"><label>📎 เอกสารแนบ (PDF / Word / Excel / รูป · ไม่เกิน 10MB ต่อไฟล์)</label><button type="button" class="btn-attach" onclick="document.getElementById(\''+inpId+'\').click()">📎 เลือกไฟล์...</button><input type="file" id="'+inpId+'" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" multiple style="display:none" onchange="handleFileAttach(this,\''+listId+'\')"><div class="file-attach-zone" id="'+listId+'"></div></div></div>';}
+function ltFileCount(l){return l&&l.attachment_files?String(l.attachment_files).split('||').filter(Boolean).length:0;}
+function ltFilesBtn(l){var n=ltFileCount(l);return '<button class="btn btn-sec btn-sm" title="เอกสารแนบ" onclick="openLetterFiles(\''+l.id+'\')">📎'+(n?' '+n:'')+'</button> ';}
+/* อัปโหลดทีละไฟล์ — คืนจำนวนไฟล์ที่ไม่สำเร็จ (ไม่กลืน error เงียบ) */
+function ltUploadFiles(id){
+  var files=(attachedFiles||[]).filter(Boolean),fail=0;
+  return files.reduce(function(p,f){return p.then(function(){
+    return gsr('serverUploadAttachment',f.name,f.b64,f.mime,'Letters',id)
+      .then(function(r){if(!r||r.success!==true)fail++;}).catch(function(){fail++;});
+  });},Promise.resolve()).then(function(){attachedFiles=[];return fail;});
+}
+function openLetterFiles(id){
+  var lt=(DB.letters||[]).find(function(x){return x.id===id});if(!lt)return;
+  attachedFiles=[];
+  var body='<div class="detail-section-title">📎 ไฟล์ที่แนบแล้ว</div>'+attachListHtml({attachment_files:lt.attachment_files})
+    +'<div class="detail-section-title" style="margin-top:14px">➕ แนบไฟล์เพิ่ม</div>'+ltAttachField('lt_more','lt_more_list');
+  openModal('เอกสารแนบ — '+esc(lt.letter_no),body,'<button class="btn btn-pri" onclick="saveLetterFiles(\''+id+'\')">⬆️ อัปโหลด</button><button class="btn btn-sec" onclick="closeModal()">ปิด</button>');
+}
+function saveLetterFiles(id){
+  if(!(attachedFiles||[]).filter(Boolean).length){alert('กรุณาเลือกไฟล์ก่อน');return;}
+  showLoading('Uploading...');
+  ltUploadFiles(id).then(function(fail){return loadAllData().then(function(){hideLoading();navigateTo('letters');openLetterFiles(id);if(fail)alert('⚠️ แนบไฟล์ไม่สำเร็จ '+fail+' ไฟล์ — ลองใหม่อีกครั้ง');});}).catch(function(e){hideLoading();alert('⚠️ '+uiErr(e))});
+}
 function renderLetters(){
  return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div class="filter-bar" style="margin-bottom:0"><input placeholder="🔍 ค้นหา..." style="width:200px" oninput="filterTable(this,\'ltTbl\')"></div><button class="btn btn-pri" onclick="openNewSMLetter()">✉️ Service Official Letter</button> <button class="btn btn-sec" onclick="openNewLetter()">OFFICIAL LETTER</button></div>'
   +'<div class="card"><div class="card-b" style="overflow-x:auto"><table class="dtbl" id="ltTbl"><thead><tr><th>เลขที่</th><th>วันที่</th><th>เรื่อง</th><th>เรียน</th><th>สถานะ</th><th>Actions</th></tr></thead><tbody>'
-  +(DB.letters.length?DB.letters.map(function(l){return '<tr><td style="font-family:var(--mono);font-size:.78rem">'+esc(l.letter_no)+'</td><td style="font-size:.78rem">'+fmtDate(l.letter_date)+'</td><td>'+esc(l.subject)+'</td><td style="font-size:.8rem">'+esc(l.recipient)+'</td><td><span class="sts '+stsCls(l.status)+'">'+esc(l.status)+'</span></td><td style="white-space:nowrap"><button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Letter\',\''+l.id+'\')">📄</button>'+(curRole==='manager'?' <button class="btn btn-dan btn-sm" onclick="deleteRecord(\'Letters\',\''+l.id+'\')">🗑</button>':'')+'</td></tr>'}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:20px">ยังไม่มีจดหมาย — กด “+ ออกจดหมายใหม่”</td></tr>')
+  +(DB.letters.length?DB.letters.map(function(l){return '<tr><td style="font-family:var(--mono);font-size:.78rem">'+esc(l.letter_no)+'</td><td style="font-size:.78rem">'+fmtDate(l.letter_date)+'</td><td>'+esc(l.subject)+'</td><td style="font-size:.8rem">'+esc(l.recipient)+'</td><td><span class="sts '+stsCls(l.status)+'">'+esc(l.status)+'</span></td><td style="white-space:nowrap">'+ltFilesBtn(l)+'<button class="btn btn-pdf btn-sm" onclick="generatePDF(\'Letter\',\''+l.id+'\')">📄</button>'+(curRole==='manager'?' <button class="btn btn-dan btn-sm" onclick="deleteRecord(\'Letters\',\''+l.id+'\')">🗑</button>':'')+'</td></tr>'}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:20px">ยังไม่มีจดหมาย — กด “+ ออกจดหมายใหม่”</td></tr>')
   +'</tbody></table></div></div>';
 }
 function openNewLetter(){gsr('serverGetNextLetter').then(function(no){
+ attachedFiles=[];
  var jobs=DB.handovers.map(function(h){return '<option value="'+esc(h.job_no)+'">'+esc(h.job_no)+' — '+esc(h.project_name)+'</option>'}).join('');
  var today=new Date().toISOString().slice(0,10);
  var body='<div class="frow"><div class="fg"><label>เลขที่หนังสือ</label><input id="f_lt_no" value="'+no+'" readonly style="background:var(--bg-elevated);font-family:var(--mono)"></div><div class="fg"><label>วันที่</label><input type="date" id="f_lt_date" value="'+today+'"></div></div>'
@@ -2832,15 +2876,17 @@ function openNewLetter(){gsr('serverGetNextLetter').then(function(no){
   +'<div class="frow"><div class="fg"><label>อ้างถึง (ถ้ามี)</label><input id="f_lt_ref" placeholder="หนังสือเลขที่..."></div><div class="fg"><label>สิ่งที่ส่งมาด้วย (ถ้ามี)</label><input id="f_lt_enc" placeholder="เอกสารแนบ..."></div></div>'
   +'<div class="frow full"><div class="fg"><label>เนื้อความ</label><textarea id="f_lt_body" style="min-height:140px" placeholder="พิมพ์เนื้อความจดหมาย... (ขึ้นบรรทัดใหม่ได้)"></textarea></div></div>'
   +'<div class="frow"><div class="fg"><label>ผู้ลงนาม</label><input id="f_lt_signer" value="'+esc(curUser)+'"></div><div class="fg"><label>ตำแหน่ง</label><input id="f_lt_pos" placeholder="ตำแหน่งผู้ลงนาม"></div></div>'
-  +'<div class="frow full"><div class="fg"><label>สำเนาเรียน (ถ้ามี)</label><input id="f_lt_cc" placeholder="ผู้รับสำเนา..."></div></div>';
+  +'<div class="frow full"><div class="fg"><label>สำเนาเรียน (ถ้ามี)</label><input id="f_lt_cc" placeholder="ผู้รับสำเนา..."></div></div>'
+  +ltAttachField('f_lt_files','f_lt_filelist');
  openModal('OFFICIAL LETTER',body,'<button class="btn btn-pri" onclick="createLetter()">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
 }).catch(function(e){alert('⚠️ '+uiErr(e))});}
 function createLetter(){
  function v(id){var el=document.getElementById(id);return el?el.value:'';}
  var data={letter_date:v('f_lt_date'),letter_type:v('f_lt_type'),recipient:v('f_lt_to').trim(),recipient_org:v('f_lt_org').trim(),subject:v('f_lt_subject').trim(),reference:v('f_lt_ref').trim(),enclosure:v('f_lt_enc').trim(),body:v('f_lt_body'),ref_job:v('f_lt_job'),signer_name:v('f_lt_signer').trim(),signer_position:v('f_lt_pos').trim(),cc:v('f_lt_cc').trim(),created_by:curUser,created_at:new Date().toISOString().slice(0,10)};
  if(!data.recipient||!data.subject||!data.body){alert('กรุณากรอก เรียน / เรื่อง / เนื้อความ ให้ครบ');return;}
- showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('⚠️ '+uiErr(r.error));return;}return loadAllData().then(function(){hideLoading();closeModal();navigateTo('letters');alert('✅ ออกจดหมาย '+r.letter_no+' เรียบร้อย');});}).catch(function(e){hideLoading();alert('⚠️ '+uiErr(e))});}
+ showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('⚠️ '+uiErr(r.error));return;}return ltUploadFiles(r.id).then(function(fail){return loadAllData().then(function(){hideLoading();closeModal();navigateTo('letters');alert('✅ ออกจดหมาย '+r.letter_no+' เรียบร้อย'+(fail?'\n⚠️ แนบไฟล์ไม่สำเร็จ '+fail+' ไฟล์ — กดปุ่ม 📎 ในรายการเพื่อแนบใหม่':''));});});}).catch(function(e){hideLoading();alert('⚠️ '+uiErr(e))});}
 function openNewSMLetter(){gsr('serverGetNextSM').then(function(no){
+ attachedFiles=[];
  var today=new Date().toISOString().slice(0,10);
  var rcp='กองบำรุงรักษาระบบไฟฟ้า\nฝ่ายปฏิบัติการและบำรุงรักษา การไฟฟ้าส่วนภูมิภาค เขต 1 (ภาคเหนือ)\nจังหวัดเชียงใหม่ เลขที่ 180 หมู่ 8 ถนนเชียงใหม่-ลำปาง ตำบลอุโมงค์\nอำเภอเมือง จังหวัดลำพูน 51150';
  var b1='ตามที่ การไฟฟ้าส่วนภูมิภาค ขอนัดหมายให้ บริษัท พรีไซซ ซิสเท็ม แอนด์ โปรเจ็ค จำกัด เข้าดำเนินการแก้ไข Interrupter Phase C ของ LBS 115 kV (S/N No.C100543/3) มีสภาพ Low Gas บริเวณ หน้า สฟฟ.มูราตะ นิคมอุตสาหกรรมเวิลด์ลำพูน ในวันที่ 12 เมษายน 2569 (รหัสสั่งการ LNB02YS-101)';
@@ -2856,7 +2902,8 @@ function openNewSMLetter(){gsr('serverGetNextSM').then(function(no){
   +'<div class="frow full"><div class="fg"><label>เนื้อความ ย่อหน้า 2</label><textarea id="sm_b2" style="min-height:96px">'+b2+'</textarea></div></div>'
   +'<div class="frow full"><div class="fg"><label>รายชื่อเจ้าหน้าที่ (บรรทัดละคน รูปแบบ: ชื่อ | เบอร์)</label><textarea id="sm_tech" style="min-height:70px">'+tl+'</textarea></div></div>'
   +'<div class="frow"><div class="fg"><label>ผู้ลงนาม</label><input id="sm_signer" value="นาย สิรดนัย ศิริสุนทร"></div><div class="fg"><label>ตำแหน่ง/แผนก</label><input id="sm_pos" value="แผนกบริการและบำรุงรักษา"></div></div>'
-  +'<div class="frow full"><div class="fg"><label>ลายเซ็น (เว้นว่าง = ใช้ลายเซ็นเริ่มต้น / วาดเพื่อแทนที่)</label>'+buildSigPad('sm_sig','ผู้ลงนาม')+'</div></div>';
+  +'<div class="frow full"><div class="fg"><label>ลายเซ็น (เว้นว่าง = ใช้ลายเซ็นเริ่มต้น / วาดเพื่อแทนที่)</label>'+buildSigPad('sm_sig','ผู้ลงนาม')+'</div></div>'
+  +ltAttachField('sm_files','sm_filelist');
  openModal('Service Official Letter',body,'<button class="btn btn-pri" onclick="createSMLetter()">บันทึก &amp; ออกเลข</button><button class="btn btn-sec" onclick="closeModal()">ยกเลิก</button>');
  setTimeout(function(){initSigPad('sm_sig');},80);
 }).catch(function(e){alert('⚠️ '+uiErr(e))});}
@@ -2864,7 +2911,7 @@ function createSMLetter(){
  function v(id){var el=document.getElementById(id);return el?el.value:'';}
  var data={category:'SM',letter_date:v('sm_date'),letter_type:'EXTERNAL',recipient:v('sm_recip').trim(),subject:v('sm_subject').trim(),site:v('sm_site').trim(),attention:v('sm_attn').trim(),reference:v('sm_ref').trim(),body:v('sm_b1').trim(),body2:v('sm_b2').trim(),tech_list:v('sm_tech'),signer_name:v('sm_signer').trim(),signer_position:v('sm_pos').trim(),sig_image:getSigDataURL('sm_sig'),created_by:curUser,created_at:new Date().toISOString().slice(0,10)};
  if(!data.recipient||!data.subject||!data.body){alert('กรุณากรอก ผู้รับ / เรื่อง / เนื้อความ ให้ครบ');return;}
- showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('⚠️ '+uiErr(r.error));return;}return loadAllData().then(function(){hideLoading();closeModal();navigateTo('letters');alert('✅ ออกจดหมาย '+r.letter_no+' เรียบร้อย');});}).catch(function(e){hideLoading();alert('⚠️ '+uiErr(e))});}
+ showLoading('Saving...');gsr('serverCreateLetter',data,curUser).then(function(r){if(!r.success){hideLoading();alert('⚠️ '+uiErr(r.error));return;}return ltUploadFiles(r.id).then(function(fail){return loadAllData().then(function(){hideLoading();closeModal();navigateTo('letters');alert('✅ ออกจดหมาย '+r.letter_no+' เรียบร้อย'+(fail?'\n⚠️ แนบไฟล์ไม่สำเร็จ '+fail+' ไฟล์ — กดปุ่ม 📎 ในรายการเพื่อแนบใหม่':''));});});}).catch(function(e){hideLoading();alert('⚠️ '+uiErr(e))});}
 /* ═══════════════════════════════════════════════════════
    LINE APPROVAL (section/manager) — ผูกบัญชี LINE ส่วนตัว + ตั้ง PIN
    งานรออนุมัติ → การ์ดเข้า LINE ส่วนตัว manager → กดอนุมัติ/ตีกลับ + ยืนยัน PIN
