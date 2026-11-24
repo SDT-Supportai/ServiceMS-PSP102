@@ -384,6 +384,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text-0);min-height
 .modal{background:var(--bg-w);border-radius:var(--r-lg);width:95%;max-width:760px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
 .modal-h{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-w);z-index:2}
 .modal-h h3{font-size:1rem;font-weight:700;color:var(--navy)}
+/* popup: คลิกพื้นหลังไม่ปิด → กล่องสั่น + ปุ่ม ✕ เรืองแดง บอกให้ปิดที่ปุ่ม · ระหว่างบันทึก/อัปโหลด ปุ่มปิดถูกล็อก */
+@keyframes mdShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+.modal.md-shake{animation:mdShake .38s cubic-bezier(.36,.07,.19,.97)}
+.modal-close.md-hint{box-shadow:0 0 0 3px rgba(229,62,62,.35);background:var(--red-d);color:var(--red)}
+.modal-close:disabled,.modal-overlay.md-busy .modal-f .btn:disabled{opacity:.45;cursor:not-allowed}
+.modal-close:disabled:hover{background:var(--bg-input);color:var(--text-2)}
+@media (prefers-reduced-motion: reduce){.modal.md-shake{animation:none}}
 .modal-close{width:32px;height:32px;border-radius:50%;background:var(--bg-input);border:none;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-2);transition:.15s}.modal-close:hover{background:var(--red-d);color:var(--red)}
 .modal-b{padding:20px 24px}
 .modal-f{padding:14px 24px;border-top:1px solid var(--border-s);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:0;background:var(--bg-w)}
@@ -1020,8 +1027,33 @@ function copyAttachment(btn,url){
   }
   if(document.body)boot(); else document.addEventListener('DOMContentLoaded',boot);
 })();
-function showLoading(msg){var el=document.getElementById('loadingOverlay');if(el){document.getElementById('loadingText').textContent=msg||'Loading...';el.style.display='flex';}}
-function hideLoading(){var el=document.getElementById('loadingOverlay');if(el)el.style.display='none';}
+function showLoading(msg){var el=document.getElementById('loadingOverlay');if(el){document.getElementById('loadingText').textContent=msg||'Loading...';el.style.display='flex';}if(modalIsOpen())modalLock(true);}
+function hideLoading(){var el=document.getElementById('loadingOverlay');if(el)el.style.display='none';modalLock(false);}
+/* ── Popup guard ─────────────────────────────────────────
+   • คลิกพื้นหลัง = ไม่ปิด (กันข้อมูลที่กรอกหาย) → modalNudge() สั่นกล่อง + เน้นปุ่ม ✕
+   • ระหว่าง showLoading() ขณะ popup เปิด = ล็อก ✕ และปุ่มท้าย popup (กันปิด/กดซ้ำกลางทาง) จน hideLoading()
+   • closeModal() จากโค้ด (หลังบันทึกสำเร็จ) ปิดได้เสมอ — ล็อกเฉพาะการปิดโดยผู้ใช้ */
+var mdBusy=false,_mdDis=[];
+function modalIsOpen(){var o=document.getElementById('modalOverlay');return !!(o&&o.classList.contains('open'));}
+function modalLock(on){
+  var o=document.getElementById('modalOverlay'),x=document.getElementById('modalCloseBtn');if(!o||!x)return;
+  if(on){
+    if(mdBusy)return;mdBusy=true;o.classList.add('md-busy');
+    x.disabled=true;x.setAttribute('aria-disabled','true');x.title='กำลังบันทึก — รอสักครู่';
+    _mdDis=[].slice.call(document.querySelectorAll('#modalFooter button')).filter(function(b){return !b.disabled;});
+    _mdDis.forEach(function(b){b.disabled=true;});
+  }else{
+    if(!mdBusy)return;mdBusy=false;o.classList.remove('md-busy');
+    x.disabled=false;x.removeAttribute('aria-disabled');x.title='ปิด';
+    _mdDis.forEach(function(b){if(b.isConnected)b.disabled=false;});_mdDis=[];
+  }
+}
+function modalNudge(){
+  var box=document.getElementById('modalBox'),x=document.getElementById('modalCloseBtn');if(!box||!x)return;
+  box.classList.remove('md-shake');void box.offsetWidth;box.classList.add('md-shake');x.classList.add('md-hint');
+  clearTimeout(modalNudge._t);modalNudge._t=setTimeout(function(){box.classList.remove('md-shake');x.classList.remove('md-hint');},700);
+}
+function requestCloseModal(){if(mdBusy){modalNudge();return;}closeModal();}
 
 /* ═══════════════════════════════════════════════════════
    DATE & FORMAT HELPERS
@@ -1276,8 +1308,8 @@ function navigateTo(pid){if(!checkSessionValid()){doLogout();return;}curPage=pid
    PAGE ROUTER
 ═══════════════════════════════════════════════════════ */
 function renderPage(pid){var el=document.getElementById('pageContent');el.setAttribute('data-page',pid);var fns={dashboard:renderDashboard,'map-tracking':renderMapTracking,'create-handover':renderCreateHandover,'create-lbs':renderCreateLBS,'create-ev':function(){return renderCreateLBS('EV')},'my-submissions':renderMySubmissions,'approval-inbox':renderApprovalInbox,'handover-list':renderHandoverList,'lbs-list':function(){lbCat='LBS';lbSubTab='lbs';return renderLBSList()},'ev-list':function(){lbCat='EV';lbSubTab='lbs';return renderLBSList()},'service-orders':renderServiceOrders,'service-reports':renderServiceReports,'team-management':renderTeamManagement,letters:renderLetters,settings:renderSettings,'user-management':renderUserManagement,'line-approval':renderLineApproval,'customer-register':function(){custSubTab='REGISTER';return renderCustomerRequestsPage()},'customer-repairs':function(){custSubTab='REPAIR';return renderCustomerRequestsPage()},'customer-requests':renderCustomerRequestsPage};var fn=fns[pid];if(fn){el.innerHTML=fn();el.classList.add('fade-in');setTimeout(function(){el.classList.remove('fade-in')},350);}else el.innerHTML='<p style="color:var(--text-2)">Page not found.</p>';}
-function openModal(title,body,footer){document.getElementById('modalTitle').innerHTML=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modalFooter').innerHTML=footer||'';document.getElementById('modalOverlay').classList.add('open');}
-function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function openModal(title,body,footer){document.getElementById('modalTitle').innerHTML=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modalFooter').innerHTML=footer||'';document.getElementById('modalOverlay').classList.add('open');if(mdBusy){mdBusy=false;_mdDis=[];modalLock(true);}}
+function closeModal(){modalLock(false);document.getElementById('modalOverlay').classList.remove('open');}
 function addLog(action){gsr('serverAddLog',curUser||'System',action).catch(function(){});}
 function getTeamName(id){var t=DB.team.find(function(x){return x.psp_id===id});return t?t.name:id;}function teamAv(t){var ini=(t.name||'').split(' ').map(function(n){return n[0]||''}).join('');var inner=t.photo?'<img src="'+esc(t.photo)+'">':ini;return '<div class="tm-av" style="background:'+(t.color||'#2d7ff9')+'14;color:'+(t.color||'#2d7ff9')+'">'+inner+'<div class="online-dot '+(t.active?'on':'off')+'"></div></div>';}
 function filterTable(inp,tblId){var v=inp.value.toLowerCase();document.querySelectorAll('#'+tblId+' tbody tr').forEach(function(tr){tr.style.display=tr.textContent.toLowerCase().includes(v)?'':'none'});}
@@ -3081,8 +3113,11 @@ document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('refreshBtn').addEventListener('click',refreshPage);
   document.getElementById('notifBtn').addEventListener('click',toggleNotif);
   document.getElementById('markReadBtn').addEventListener('click',markAllNotificationsRead);
-  document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===document.getElementById('modalOverlay'))closeModal();});
-  document.getElementById('modalCloseBtn').addEventListener('click',closeModal);
+  /* พื้นหลัง popup: ไม่ปิด แค่สั่นเตือน — นับเฉพาะกด+ปล่อยบนพื้นหลังจริง (ลากเลือกข้อความในช่องแล้วปล่อยนอกกล่องจะไม่สั่น) */
+  (function(){var ov=document.getElementById('modalOverlay'),downOnBg=false;
+    ov.addEventListener('mousedown',function(e){downOnBg=(e.target===ov);});
+    ov.addEventListener('click',function(e){if(e.target===ov&&downOnBg)modalNudge();downOnBg=false;});})();
+  document.getElementById('modalCloseBtn').addEventListener('click',requestCloseModal);
   document.getElementById('logoutBtn').addEventListener('click',doLogout);
   document.addEventListener('click',function(e){if(!e.target.closest('.notif-b')&&!e.target.closest('.notif-panel')){var p=document.getElementById('notifPanel');if(p)p.classList.remove('open');}});
   tryRestore();
